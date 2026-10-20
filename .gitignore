@@ -17,3 +17,5 @@ report/performance.pdf
 report/*.aux
 report/*.log
 report/*.out
+bench-jmh/lib/
+out-jmh/

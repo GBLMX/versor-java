@@ -33,6 +33,7 @@ public final class GaTest {
         testBatch();
         testMatrixInverse();
         testSandwichFastPaths();
+        testSparse();
         System.out.println("OK: " + passed + " checks passed");
     }
 
@@ -568,6 +569,49 @@ public final class GaTest {
         expected.set(0, 0, Multivector.scalar(E3.SIG, 0.5));
         expected.set(1, 1, Multivector.scalar(E3.SIG, 0.25));
         check("matrix scalar inverse", known.inverse().distanceTo(expected) < 1e-12);
+    }
+
+    private static void testSparse() {
+        Random rnd = new Random(314);
+        Signature sig = Signature.euclidean(8);
+        int[] masksA = new int[12];
+        int[] masksB = new int[12];
+        double[] valsA = new double[12];
+        double[] valsB = new double[12];
+        for (int i = 0; i < 12; i++) {
+            masksA[i] = rnd.nextInt(sig.size);
+            masksB[i] = rnd.nextInt(sig.size);
+            valsA[i] = rnd.nextDouble() * 2 - 1;
+            valsB[i] = rnd.nextDouble() * 2 - 1;
+        }
+        SparseMultivector sa = SparseMultivector.of(sig, masksA, valsA);
+        SparseMultivector sb = SparseMultivector.of(sig, masksB, valsB);
+        Multivector da = sa.toDense();
+        Multivector db = sb.toDense();
+        check("sparse roundtrip", sa.nnz() > 0
+                && sa.toDense().distanceTo(da) < 1e-15);
+        check("sparse gp matches dense",
+                sa.gp(sb).toDense().distanceTo(da.gp(db)) < 1e-12);
+        check("sparse sandwich matches dense",
+                sa.sandwich(sb).toDense().distanceTo(da.sandwich(db)) < 1e-12);
+        check("sparse norm2 matches dense",
+                Math.abs(sa.norm2() - da.norm2()) < 1e-12);
+
+        Signature high = Signature.euclidean(12);
+        SparseMultivector e1 = SparseMultivector.of(high, new int[]{1}, new double[]{1});
+        SparseMultivector e2 = SparseMultivector.of(high, new int[]{2}, new double[]{1});
+        check("Cl(12) sparse product", e1.gp(e2).toDense()
+                .distanceTo(Multivector.blade(high, 3, 1)) < 1e-15);
+        check("Cl(12) on-demand signs", e1.gp(e1).toDense()
+                .distanceTo(Multivector.blade(high, 0, 1)) < 1e-15);
+        Multivector de1 = Multivector.blade(high, 1, 1);
+        Multivector de2 = Multivector.blade(high, 2, 1);
+        check("Cl(12) dense gp", de1.gp(de2)
+                .distanceTo(Multivector.blade(high, 3, 1)) < 1e-15);
+        check("Cl(12) dense op/ip", de1.op(de2)
+                .distanceTo(Multivector.blade(high, 3, 1)) < 1e-15
+                && de1.ip(de1).distanceTo(Multivector.blade(high, 0, 1)) < 1e-15);
+        check("Cl(15) rejected", throwsIllegal(() -> Signature.euclidean(15)));
     }
 
     private static void testSandwichFastPaths() {

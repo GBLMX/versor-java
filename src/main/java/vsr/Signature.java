@@ -17,13 +17,14 @@ public final class Signature {
     private final int nameOffset;
     /**
      * Blade-product sign table, built lazily on first multiplication.
-     * Cl(10) costs at most 4 MiB; signatures that never multiply pay nothing.
+     * Only built for n &le; 10 (Cl(10): 4 MiB); larger algebras compute signs
+     * on demand so they never allocate a quadratic table.
      */
     private volatile int[][] productSign;
 
     private Signature(int nameOffset, int[] metric) {
-        if (metric.length > 10) {
-            throw new IllegalArgumentException("Clifford algebras above 10 generators are not supported");
+        if (metric.length > 14) {
+            throw new IllegalArgumentException("Clifford algebras above 14 generators are not supported");
         }
         this.n = metric.length;
         this.nameOffset = nameOffset;
@@ -95,11 +96,13 @@ public final class Signature {
      * Returns 0 when a null generator would be squared.
      */
     public int bladeProductSign(int a, int b) {
-        return signTable()[a][b];
+        int[][] table = signTable();
+        return table != null ? table[a][b] : computeBladeProductSign(a, b);
     }
 
-    /** Lazily builds and returns the full sign table (never null). */
+    /** Lazily builds the sign table for n &le; 10; returns null above. */
     int[][] signTable() {
+        if (n > 10) return null;
         int[][] table = productSign;
         if (table != null) return table;
         synchronized (this) {
@@ -118,7 +121,7 @@ public final class Signature {
         }
     }
 
-    private int computeBladeProductSign(int a, int b) {
+    int computeBladeProductSign(int a, int b) {
         int sign = 1;
         for (int j = 0; j < n; j++) {
             if ((b & (1 << j)) == 0) continue;

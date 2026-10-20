@@ -104,11 +104,11 @@ public final class Multivector {
         for (int a = 0; a < c.length; a++) {
             double ca = c[a];
             if (ca == 0) continue;
-            int[] row = signs[a];
+            int[] row = signs != null ? signs[a] : null;
             for (int b = 0; b < c.length; b++) {
                 double cb = o.c[b];
                 if (cb == 0) continue;
-                int sign = row[b];
+                int sign = row != null ? row[b] : sig.computeBladeProductSign(a, b);
                 if (sign != 0) r[a ^ b] += sign * ca * cb;
             }
         }
@@ -123,11 +123,11 @@ public final class Multivector {
         for (int a = 0; a < c.length; a++) {
             double ca = c[a];
             if (ca == 0) continue;
-            int[] row = signs[a];
+            int[] row = signs != null ? signs[a] : null;
             for (int b = 0; b < c.length; b++) {
                 double cb = o.c[b];
                 if (cb == 0 || (a & b) != 0) continue;
-                int sign = row[b];
+                int sign = row != null ? row[b] : sig.computeBladeProductSign(a, b);
                 if (sign != 0) r[a ^ b] += sign * ca * cb;
             }
         }
@@ -142,11 +142,11 @@ public final class Multivector {
         for (int a = 0; a < c.length; a++) {
             double ca = c[a];
             if (ca == 0) continue;
-            int[] row = signs[a];
+            int[] row = signs != null ? signs[a] : null;
             for (int b = 0; b < c.length; b++) {
                 double cb = o.c[b];
                 if (cb == 0 || (a & b) != a) continue;
-                int sign = row[b];
+                int sign = row != null ? row[b] : sig.computeBladeProductSign(a, b);
                 if (sign != 0) r[a ^ b] += sign * ca * cb;
             }
         }
@@ -166,11 +166,11 @@ public final class Multivector {
         for (int a = 0; a < c.length; a++) {
             double ca = c[a];
             if (ca == 0) continue;
-            int[] row = signs[a];
+            int[] row = signs != null ? signs[a] : null;
             for (int b = 0; b < c.length; b++) {
                 double cb = o.c[b];
                 if (cb == 0 || (a & b) != b) continue;
-                int sign = row[b];
+                int sign = row != null ? row[b] : sig.computeBladeProductSign(a, b);
                 if (sign != 0) r[a ^ b] += sign * ca * cb;
             }
         }

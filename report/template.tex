@@ -45,7 +45,8 @@ JOML & %%JOMLVERSION%% \\
 
 每个测量点自动校准迭代次数，输入用固定种子随机生成；分配量取自线程分配计数
 （ThreadMXBean）。JIT 对照使用 \texttt{-XX:TieredStopAtLevel=1} 与默认 C2。
-本机非隔离环境，绝对纳秒存在 $\pm$10\% 抖动，跨行比较优先看比例。未使用 JMH。
+本机非隔离环境，绝对纳秒存在 $\pm$10\% 抖动，跨行比较优先看比例。
+第 1--8 节使用自建 harness；高维稀疏、JMH 复核与端到端数据见第 9--10 节。
 
 \section{维度扫描}
 表 1 为稠密输入下各运算的单次耗时。图 1 与图 2 给出几何积的缩放：总时间按 $4^n$
@@ -117,6 +118,45 @@ JOML 使用 float 且多数 API 原地写回，因此单次四元数/矩阵变�
 \includegraphics[width=0.82\textwidth]{figures/fig-jit.pdf}
 \caption{同一基准在 C2 与仅 C1 下的对比。}\label{fig:jit}
 \end{figure}
+
+\section{高维稀疏与按需符号表}
+%%BIGSPARSE%%
+
+把输出表示改为（mask, value）COO 列表后，几何积的循环范围从 $4^n$ 对降到
+$k^2$ 对，低密度时用开放寻址累加，高密度时才退回稠密累加器。
+$n=10$、$k=10$（约 1\% 密度）时 \texttt{gp} 为 1.2 $\mu$s，相对稠密
+815 $\mu$s 约 700$\times$；$k=512$ 时仍有 3.3$\times$。
+$n\ge11$ 不构建符号表（n=14 的表会是 1 GiB），改为按需计算符号；
+代价是每对约 15--50 ns，而不是查表的约 1 ns。
+注意 sandwich 会先产生稠密中间结果，成本约为两次 \texttt{gp} 再加排序，
+高维高密度下不是稀疏路径的强项。
+
+\section{JMH 复核}
+%%JMH%%
+
+JMH 的平均值与既有 harness 一致（n=10 \texttt{gp} 约 0.89 ms）。
+分配量在 n=3 时为 \texttt{gp} 80 B/op、\texttt{sandwich} 144 B/op，
+即每次调用分配 1--2 个结果对象；维度升高时按 $2^n$ 增长。
+批量与快速路径的单点成本低于逐元素调用，四线程下反而略慢，
+说明该路径受内存带宽/分配限制，而不是 CPU 核数。
+
+\section{端到端与并发}
+%%RENDER%%
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.72\textwidth]{figures/fig-render.pdf}
+\caption{20 万点每帧变换路径的每点成本（对数轴）。}\label{fig:render}
+\end{figure}
+
+%%SCALE%%
+
+%%ROBOT%%
+
+逐帧路径上，GA 直接变换 33 ns/点，批量 SoA 20 ns/点，而缓存
+\texttt{Matrix4f} 后仅 0.9 ns/点；适配层每次重算矩阵则要 348 ns/点。
+14 线程的批量吞吐只有单线程的 2.2$\times$：每线程都要分配自己的结果数组，
+瓶颈是内存带宽。机器人求解中，3$\times$3 P3 矩阵求逆约 96 $\mu$s，
+四段 motor 正运动学一次 219 ns。
 
 \section{建议}
 \begin{enumerate}

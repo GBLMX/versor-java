@@ -20,6 +20,11 @@ joml <- read.csv("data/joml.csv", stringsAsFactors = FALSE)
 jit <- read.csv("data/jit.csv", stringsAsFactors = FALSE)
 sparse <- read.csv("data/sparse.csv", stringsAsFactors = FALSE)
 cliff <- read.csv("data/cliff.csv", stringsAsFactors = FALSE)
+bigsparse <- read.csv("data/big-sparse.csv", stringsAsFactors = FALSE)
+jmh <- read.csv("data/jmh.csv", stringsAsFactors = FALSE)
+render <- read.csv("data/render.csv", stringsAsFactors = FALSE)
+scale <- read.csv("data/scale.csv", stringsAsFactors = FALSE)
+robot <- read.csv("data/robot.csv", stringsAsFactors = FALSE)
 meta <- read.csv("data/meta.csv", stringsAsFactors = FALSE)
 meta_val <- function(key) meta$value[meta$key == key]
 
@@ -83,6 +88,36 @@ barplot(m, beside = TRUE, log = "y", col = c("#1f5fa8", "#c2410c"),
         ylab = "ns/op（对数轴）", main = "C2 与仅 C1 的 JIT 对比",
         las = 1, cex.names = 0.95)
 legend("topright", c("C2", "仅 C1"), fill = c("#1f5fa8", "#c2410c"), bty = "n")
+dev.off()
+
+cairo_pdf("figures/fig-sparse.pdf", width = 6.2, height = 4.0, family = CJK)
+sp <- bigsparse[bigsparse$op == "gp" & bigsparse$k > 0, ]
+plot(NA, xlim = range(sp$k), ylim = range(sp$ns), log = "xy",
+     xlab = "非零 blade 数 k (对数轴)", ylab = "单次 gp (ns, 对数轴)",
+     main = "高维稀疏几何积：成本随 k 而非 4^n")
+cols <- c("#1f5fa8", "#b45309", "#3f7f5f")
+for (i in seq_along(c(10, 12, 14))) {
+    d <- sp[sp$n == c(10, 12, 14)[i], ]
+    d <- d[order(d$k), ]
+    lines(d$k, d$ns, type = "b", pch = 19, col = cols[i], lwd = 2)
+}
+dense10 <- bigsparse$ns[bigsparse$op == "gp" & bigsparse$n == 10 & bigsparse$k == -1]
+abline(h = dense10, lty = 2, col = "grey40")
+legend("topleft", c(paste0("n=", c(10, 12, 14)), "n=10 稠密"),
+       col = c(cols, "grey40"), lty = c(1, 1, 1, 2), pch = c(19, 19, 19, NA), bty = "n")
+dev.off()
+
+cairo_pdf("figures/fig-render.pdf", width = 6.2, height = 3.6, family = CJK)
+par(mar = c(4, 8, 3, 1))
+barplot(rev(render$ns_per_point), names.arg = rev(render$variant), horiz = TRUE,
+        las = 1, log = "x", col = "#3f7f5f", xlab = "每点耗时 (ns, 对数轴)",
+        main = "每帧 20 万点的变换路径")
+dev.off()
+
+cairo_pdf("figures/fig-scale.pdf", width = 6.2, height = 3.6, family = CJK)
+plot(scale$threads, scale$points_per_sec / 1e6, type = "b", pch = 19, lwd = 2,
+     col = "#1f5fa8", xlab = "线程数", ylab = "吞吐 (M 点/秒)",
+     main = "批量 sandwich 的线程扩展（20 万点）")
 dev.off()
 
 # ------------------------------------------------------------------- tables
@@ -168,6 +203,69 @@ sparse_table <- function() {
            paste(rows, collapse = "\n"), "\n\\bottomrule\n\\end{tabular}\n")
 }
 
+bigsparse_table <- function() {
+    pick <- bigsparse[bigsparse$op == "gp" & bigsparse$n %in% c(10, 12, 14) & bigsparse$k %in% c(2, 8, 10, 32, 128, 512), ]
+    rows <- vapply(seq_len(nrow(pick)), function(i) {
+        r <- pick[i, ]
+        sprintf("%d & %d & %s & %s & %s \\\\", r$n, r$k,
+                fmt(bigsparse$ns[bigsparse$n == r$n & bigsparse$k == r$k & bigsparse$op == "gp"]),
+                fmt(bigsparse$ns[bigsparse$n == r$n & bigsparse$k == r$k & bigsparse$op == "sandwich"]),
+                sprintf("%.2f", r$ns_per_pair))
+    }, "")
+    dens <- bigsparse[bigsparse$k == -1 & bigsparse$n == 10, ]
+    drows <- paste0("10 & 稠密 & ", fmt(dens$ns[dens$op == "gp"]), " & ",
+                    fmt(dens$ns[dens$op == "sandwich"]), " & -- \\\\")
+    paste0("\\begin{tabular}{rrrrr}\n\\toprule\n",
+           "n & k & gp ns & sandwich ns & ns/pair \\\\\n\\midrule\n",
+           paste(rows, collapse = "\n"), "\n\\midrule\n",
+           paste(drows, collapse = "\n"),
+           "\n\\bottomrule\n\\end{tabular}\n")
+}
+
+jmh_table <- function() {
+    d <- jmh[jmh$bench == "dense", ]
+    dims <- sort(unique(d$n))
+    rows <- vapply(dims, function(n) {
+        v <- function(op) sprintf("%.1f", d$ns[d$n == n & d$op == op][1])
+        sprintf("%d & %s & %s & %s \\\\", n, v("gp"), v("sandwich"), v("inverse"))
+    }, "")
+    f <- jmh[jmh$bench == "fast" & jmh$threads == 1, ]
+    frows <- paste0("\\texttt{", tex(f$op), "} & ", sprintf("%.1f", f$ns), " \\\\")
+    paste0("\\begin{tabular}{rrrr}\n\\toprule\n",
+           "n & gp & sandwich & inverse \\\\\n\\midrule\n",
+           paste(rows, collapse = "\n"),
+           "\n\\bottomrule\n\\end{tabular}\n\\vspace{0.5em}\n",
+           "\\begin{tabular}{lr}\n\\toprule\n快速路径 / 批量 & ns/op \\\\\n\\midrule\n",
+           paste(frows, collapse = "\n"), "\n\\bottomrule\n\\end{tabular}\n")
+}
+
+render_table <- function() {
+    rows <- vapply(seq_len(nrow(render)), function(i) {
+        r <- render[i, ]
+        sprintf("\\texttt{%s} & %d & %s & %s & %.0f \\\\", tex(r$variant), r$n,
+                fmt(r$ns_per_point), fmt(r$p99_ns / 1e6), r$bytes)
+    }, "")
+    paste0("\\begin{tabular}{lrrrr}\n\\toprule\n",
+           "路径 & 点数 & ns/点 & p99 帧 (ms) & 分配 B/帧 \\\\\n\\midrule\n",
+           paste(rows, collapse = "\n"), "\n\\bottomrule\n\\end{tabular}\n")
+}
+
+scale_table <- function() {
+    base <- scale$points_per_sec[scale$threads == 1]
+    rows <- paste0(scale$threads, " & ", sprintf("%.1f", scale$points_per_sec / 1e6),
+                   " & ", sprintf("%.2f", scale$ns_per_point),
+                   " & ", sprintf("%.2f$\\times$", scale$points_per_sec / base), " \\\\")
+    paste0("\\begin{tabular}{rrrr}\n\\toprule\n",
+           "线程 & M 点/秒 & ns/点 & 相对 1 线程 \\\\\n\\midrule\n",
+           paste(rows, collapse = "\n"), "\n\\bottomrule\n\\end{tabular}\n")
+}
+
+robot_table <- function() {
+    rows <- paste0("\\texttt{", tex(robot$op), "} & ", sprintf("%.2f", robot$ns), " \\\\")
+    paste0("\\begin{tabular}{lr}\n\\toprule\n机器人求解路径 & ns/op \\\\\n\\midrule\n",
+           paste(rows, collapse = "\n"), "\n\\bottomrule\n\\end{tabular}\n")
+}
+
 # --------------------------------------------------------------------- tex
 
 template <- paste(readLines("template.tex", warn = FALSE), collapse = "\n")
@@ -178,6 +276,11 @@ fill <- function(text, key, value) {
 }
 
 template <- fill(template, "%%SWEEP%%", sweep_table())
+template <- fill(template, "%%BIGSPARSE%%", bigsparse_table())
+template <- fill(template, "%%JMH%%", jmh_table())
+template <- fill(template, "%%RENDER%%", render_table())
+template <- fill(template, "%%SCALE%%", scale_table())
+template <- fill(template, "%%ROBOT%%", robot_table())
 template <- fill(template, "%%PAIRS%%", pair_table())
 template <- fill(template, "%%CLIFF%%", cliff_table())
 template <- fill(template, "%%BATCH%%", batch_table())

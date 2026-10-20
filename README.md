@@ -9,12 +9,15 @@ API 语义参考 `versor`（C++，`/home/wangwenjie/Documents/代码库/versor`�
 
 ## 范围
 
-- 任意 `Cl(p,q,r)`，生成元 ≤ 10 个（$2^n$ 系数）
+- 任意 `Cl(p,q,r)`，生成元 ≤ 14 个（$2^n$ 系数）；n≤10 用预计算符号表，
+  n=11–14 按需计算符号（每对更慢，避免 1 GiB 级符号表）
 - 多向量：几何积、外积、左/右缩并、回归积、交换子/反交换子、
   reverse/conjugate/involution、grade 投影、dual、范数、逆（versor 快速路径
   与任意可逆元素的通用求逆）、指数（缩放平方和）
 - `MultivectorBatch`：按 blade 连续存储的批量运算（gp / gpRight / sandwich /
   reverse / 算术），避免逐元素对象分配
+- `SparseMultivector`：COO（mask + value）表示，低密度积用哈希累加，
+  高密度退回稠密累加器；适合 k≪2^n 的高维输入
 - `MultivectorMatrix`：多向量矩阵乘、转置与 Gauss-Jordan 求逆
 - `E3`：向量、转子、旋转、slerp、log
 - `P3`（PGA3）：点/面/线、translator、motor、变换、平面/直线求交、
@@ -156,11 +159,16 @@ Multivector n = sphere.normal(0, 0);                // 单位法向 e1
 ## 性能
 
 `bench.sh` 是零依赖基准（维度扫描、批量扩展、分配量、矩阵/高维压力、C1/C2 对比，
-检测到 JOML 时附带四元数/矩阵横向对比）：
+检测到 JOML 时附带四元数/矩阵横向对比）。`bench-jmh.sh` 下载 JMH 1.37 并跑
+带 `-prof gc` 的复核；`render` 模式覆盖端到端、并发与机器人求解：
 
 ```bash
-./bench.sh            # 全量
-./bench.sh sweep      # 维度扫描
+./bench.sh              # 全量
+./bench.sh sweep        # 维度扫描
+./bench.sh sparse       # 高维稀疏 n=8–14
+./bench.sh render       # 端到端/并发/机器人（需要 JOML）
+./bench.sh jmh 'JmhDense' -prof gc
+./bench.sh jmh 'JmhFast' -t 1
 BENCH_JAVA_OPTS="-XX:TieredStopAtLevel=1" ./bench.sh jit
 ```
 
