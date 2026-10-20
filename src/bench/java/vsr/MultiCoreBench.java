@@ -2,7 +2,9 @@ package vsr;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -14,6 +16,9 @@ import java.util.concurrent.Future;
 public final class MultiCoreBench {
     private static final int[] THREADS = {1, 2, 4, 8, 14, 20};
     private static final int REPS = 5;
+    private static final Map<String, Double> REF_NS = new HashMap<>();
+    private static double batchBase;
+    private static double scalarBase;
 
     public static void main(String[] args) throws Exception {
         System.out.println("cpus=" + Runtime.getRuntime().availableProcessors());
@@ -66,10 +71,9 @@ public final class MultiCoreBench {
         Arrays.sort(times);
         long totalOps = (long) threads * opsPerThread;
         double nsPerOp = times[REPS / 2] / totalOps;
-        double base = reference(name);
+        double base = REF_NS.computeIfAbsent(name, k -> nsPerOp);
         System.out.printf("MC,%s,%d,%d,%.1f,%.2f,%.2f%n",
-                name, threads, totalOps, nsPerOp,
-                base > 0 ? base / nsPerOp : 0, base > 0 ? base / nsPerOp / threads : 0);
+                name, threads, totalOps, nsPerOp, base / nsPerOp, base / nsPerOp / threads);
     }
 
     private static void warmup(ExecutorService pool, int threads, int ops,
@@ -85,15 +89,6 @@ public final class MultiCoreBench {
         for (Future<Double> f : fs) f.get();
     }
 
-    private static double reference(String name) {
-        return switch (name) {
-            case "gp_n10" -> 850_000;
-            case "op_n10" -> 77_000;
-            case "batch_sandwich" -> 19.4;
-            case "scalar_sandwich" -> 31.0;
-            default -> 0;
-        };
-    }
 
     private static void scalarScale(int threads, int points, Multivector motor)
             throws Exception {
@@ -134,10 +129,10 @@ public final class MultiCoreBench {
         pool.shutdown();
         Arrays.sort(times);
         double nsPerPoint = times[REPS / 2] / (double) points;
-        double base = reference("scalar_sandwich");
+        if (scalarBase == 0) scalarBase = nsPerPoint;
         System.out.printf("MC,scalar_sandwich,%d,%d,%.1f,%.2f,%.2f%n",
-                threads, points, nsPerPoint, base / nsPerPoint,
-                base / nsPerPoint / threads);
+                threads, points, nsPerPoint, scalarBase / nsPerPoint,
+                scalarBase / nsPerPoint / threads);
     }
 
     private static void batchScale(int threads, MultivectorBatch all, Multivector motor)
@@ -188,9 +183,9 @@ public final class MultiCoreBench {
         pool.shutdown();
         Arrays.sort(times);
         double nsPerPoint = times[REPS / 2] / (double) n;
-        double base = reference("batch_sandwich");
+        if (batchBase == 0) batchBase = nsPerPoint;
         System.out.printf("MC,batch_sandwich,%d,%d,%.1f,%.2f,%.2f,%.1f%n",
-                threads, n, nsPerPoint, base / nsPerPoint, base / nsPerPoint / threads,
+                threads, n, nsPerPoint, batchBase / nsPerPoint, batchBase / nsPerPoint / threads,
                 2.0 * 16 * 8 / nsPerPoint);
         if (sink == 42) System.out.print("");
     }

@@ -253,10 +253,10 @@ n=8 为 5.6$\times$，n=3 为 1.6$\times$。几何积仍需访问全部配对，
 %%MULTICORE%%
 
 测试机为 6P+8E、20 逻辑核。独立输入的 \texttt{gp}（n=10）在 8/14/20 线程
-分别为 5.1$\times$/7.3$\times$/8.4$\times$，新 \texttt{op} 为 4.6$\times$/6.4$\times$/8.8$\times$；
+分别为 5.1$\times$/7.6$\times$/8.4$\times$，新 \texttt{op} 为 4.1$\times$/6.7$\times$/8.9$\times$；
 两者每线程都分配结果对象，8 线程后受共享缓存、内存与 GC 限制。
 批量 sandwich 在 4 线程即达到约 30 GB/s 的平台（2.3$\times$），更多线程无收益；
-标量 sandwich 到 20 线程为 3.6$\times$（31.3→8.6 ns/点）。
+标量 sandwich 到 20 线程为 3.1$\times$（31.4→10.1 ns/点）。
 因此批量路径应按 4--8 线程配置，通用 GA 计算可继续吃满剩余核心，但不要期待线性扩展。
 
 \begin{figure}[htbp]\centering
