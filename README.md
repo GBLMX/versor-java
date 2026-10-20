@@ -13,8 +13,9 @@ API 语义参考 `versor`（C++，`/home/wangwenjie/Documents/代码库/versor`�
   前 p 个 +1、后 q 个 −1 的度量；n≤10 用预计算符号表，n=11–14 按需计算符号
   （每对更慢，避免 1 GiB 级符号表）
 - 多向量：几何积、外积、左/右缩并、回归积、交换子/反交换子、
-  reverse/conjugate/involution、grade 投影、dual、范数、逆（versor 快速路径
-  与带均衡化/残差检查的任意可逆元素通用求逆）、指数（缩放平方和）
+  reverse/conjugate/involution、grade 投影、dual/undual、标量积、奇 versor 反射、
+  多向量除法、范数、逆（versor 快速路径与带均衡化/残差检查的任意可逆元素通用求逆）、
+  指数（缩放平方和）
 - `MultivectorBatch`：按 blade 连续存储的批量运算（gp / gpRight / sandwich /
   reverse / 算术），避免逐元素对象分配；`sandwich(versor, out)` 复用输出缓冲，
   `slice(from,to)` 支持分块并行
@@ -87,6 +88,44 @@ double[] hit = P3.pointCoords(
 ```
 
 示例：`examples/CubeDemo.java` 把一个立方体的 8 个顶点用 motor 变换并打印。
+
+### C++ versor 语义对齐
+
+```java
+Multivector a = E3.vec(1, 2, 3);
+Multivector b = E3.vec(4, 5, 6);
+
+double dot = a.scalarProduct(b);          // 32
+Multivector q = a.divide(b);              // a * b^-1（b 为 versor/blade）
+Multivector back = q.mul(b);              // 回到 a
+
+Multivector d = E3.vec(1, 0, 0).dual();
+Multivector same = d.undual();            // 补集对偶的逆
+
+Multivector reflected = E3.vec(0, 1, 0).reflect(E3.vec(1, 0, 0)); // e2 不变
+```
+
+`undual()` 是 Java 补集 `dual()` 的逆，不等同于 C++ 的 Hodge `A * I`；
+退化度量下不要直接套用 C++ 的 `dual/undual` 符号。
+
+### 可读写法
+
+Java 没有运算符重载，除 C++ 对应的 `gp/op/ip/vee/sandwich` 外，提供一组读法更直接的别名：
+
+| 可读写法 | 等价写法 | 语义 |
+|---|---|---|
+| `a.mul(b)` | `a.gp(b)` | 几何积 |
+| `a.mul(s)` | `a.scale(s)` | 标量乘法 |
+| `a.wedge(b)` | `a.op(b)` | 外积 |
+| `a.contract(b)` | `a.ip(b)` | 左缩并 |
+| `a.regressive(b)` | `a.vee(b)` | 回归积 |
+| `versor.apply(x)` | `versor.sandwich(x)` | 偶 versor 变换 |
+
+```java
+Multivector rotor = E3.rotor(0, 0, 1, Math.PI / 2);
+Multivector image = rotor.apply(E3.vec(1, 0, 0));   // e2
+Multivector area = E3.vec(1, 0, 0).wedge(E3.vec(0, 1, 0)); // e12
+```
 
 ## 运动学：速度、加速度、jerk
 
@@ -249,7 +288,7 @@ Multivector.GeneralInverse info = a.inverseGeneralResult(); // 不抛，读 resi
 ./build.sh        # javac + 自带断言测试（无需 Maven/Gradle）
 ```
 
-`build.sh` 会编译 `src/main/java`，然后运行 `vsr.GaTest`（243 项断言）。
+`build.sh` 会编译 `src/main/java`，然后运行 `vsr.GaTest`（412 项断言）。
 `build-blaze3d.sh` 额外编译 JOML 适配层并运行 `vsr.blaze3d.Blaze3DTest`（11 项断言）。
 示例：
 

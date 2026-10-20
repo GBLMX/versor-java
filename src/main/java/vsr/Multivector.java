@@ -96,7 +96,31 @@ public final class Multivector {
         return scale(1.0 / s);
     }
 
-    /** Geometric product. */
+    /**
+     * Right division {@code A / B = A B^-1}. The divisor must be a versor or
+     * blade for the fast inverse; for an arbitrary invertible divisor use
+     * {@code a.gp(b.inverseGeneral())}.
+     */
+    public Multivector divide(Multivector divisor) {
+        return gp(divisor.inverse());
+    }
+
+    /** Scalar product {@code A . B = scalar(AB)}, the grade-0 part of the gp. */
+    public double scalarProduct(Multivector o) {
+        return gp(o).scalarPart();
+    }
+
+    /** Readable alias for {@link #gp(Multivector)}. */
+    public Multivector mul(Multivector o) {
+        return gp(o);
+    }
+
+    /** Scalar multiplication, matching the {@link #mul(Multivector)} spelling. */
+    public Multivector mul(double s) {
+        return scale(s);
+    }
+
+    /** Geometric product. See {@link #mul(Multivector)} for the readable alias. */
     public Multivector gp(Multivector o) {
         check(o);
         double[] r = new double[c.length];
@@ -147,7 +171,7 @@ public final class Multivector {
         return idx;
     }
 
-    /** Outer (wedge) product. Enumerates disjoint blades: O(3^n) pairs. */
+    /** Outer (wedge) product. Enumerates disjoint blades: O(3^n) pairs. See {@link #wedge(Multivector)}. */
     public Multivector op(Multivector o) {
         check(o);
         double[] r = new double[c.length];
@@ -170,7 +194,12 @@ public final class Multivector {
         return new Multivector(sig, r);
     }
 
-    /** Left contraction A ⌋ B. Enumerates supersets of A: O(3^n) pairs. */
+    /** Readable alias for {@link #op(Multivector)}. */
+    public Multivector wedge(Multivector o) {
+        return op(o);
+    }
+
+    /** Left contraction A ⌋ B. Enumerates supersets of A: O(3^n) pairs. See {@link #contract(Multivector)}. */
     public Multivector ip(Multivector o) {
         check(o);
         double[] r = new double[c.length];
@@ -194,9 +223,19 @@ public final class Multivector {
         return new Multivector(sig, r);
     }
 
-    /** Regressive product, built from the complement dual. */
+    /** Readable alias for {@link #ip(Multivector)}. */
+    public Multivector contract(Multivector o) {
+        return ip(o);
+    }
+
+    /** Regressive product, built from the complement dual. See {@link #regressive(Multivector)}. */
     public Multivector vee(Multivector o) {
         return dual().op(o.dual()).dual();
+    }
+
+    /** Readable alias for {@link #vee(Multivector)}. */
+    public Multivector regressive(Multivector o) {
+        return vee(o);
     }
 
     /** Right contraction A ⌊ B. Enumerates subsets of A: O(3^n) pairs. */
@@ -286,14 +325,42 @@ public final class Multivector {
         double[] r = new double[c.length];
         for (int m = 0; m < c.length; m++) {
             if (c[m] == 0) continue;
-            int comp = full ^ m;
-            int swaps = 0;
-            for (int i = 0; i < sig.n; i++) {
-                if ((m & (1 << i)) != 0) swaps += Integer.bitCount(comp & ((1 << i) - 1));
-            }
-            r[comp] += ((swaps & 1) == 0 ? 1 : -1) * c[m];
+            r[full ^ m] += dualSign(m) * c[m];
         }
         return new Multivector(sig, r);
+    }
+
+    /**
+     * Inverse of {@link #dual()} under the Poincare complement convention:
+     * {@code a.dual().undual() == a} and {@code a.undual().dual() == a}.
+     *
+     * <p>This is not the C++ versor Hodge undual ({@code A * I}); for a
+     * non-degenerate algebra the two differ by a sign convention that depends
+     * on the grade and dimension.
+     */
+    public Multivector undual() {
+        int full = sig.fullMask();
+        double[] r = new double[c.length];
+        for (int m = 0; m < c.length; m++) {
+            int comp = full ^ m;
+            if (c[comp] == 0) continue;
+            int k = Integer.bitCount(m);
+            int sign = dualSign(comp) * (((k * (sig.n - k)) & 1) == 0 ? 1 : -1);
+            r[m] += sign * c[comp];
+        }
+        return new Multivector(sig, r);
+    }
+
+    /** Sign contributed by complementing {@code mask} in {@link #dual()}. */
+    private int dualSign(int mask) {
+        int comp = sig.fullMask() ^ mask;
+        int swaps = 0;
+        for (int i = 0; i < sig.n; i++) {
+            if ((mask & (1 << i)) != 0) {
+                swaps += Integer.bitCount(comp & ((1 << i) - 1));
+            }
+        }
+        return (swaps & 1) == 0 ? 1 : -1;
     }
 
     /** Scalar part of A ~A; negative for timelike/null-signature blades. */
@@ -522,7 +589,7 @@ public final class Multivector {
         return v;
     }
 
-    /** Sandwich product M x ~M (a transformation by the versor M). */
+    /** Sandwich product M x ~M (a transformation by the versor M). See {@link #apply(Multivector)}. */
     public Multivector sandwich(Multivector x) {
         check(x);
         if (isE3() && onlyEvenGrades() && x.onlyBlades(1, 2, 4)) {
@@ -532,6 +599,21 @@ public final class Multivector {
             return sandwichPgaPoint(x);
         }
         return gp(x).gp(reverse());
+    }
+
+    /** Readable alias for {@link #sandwich(Multivector)}. */
+    public Multivector apply(Multivector x) {
+        return sandwich(x);
+    }
+
+    /**
+     * Reflection of this by an odd unit versor: {@code b x^ b~}, where
+     * {@code x^} is the grade involution. This is the C++ versor
+     * {@code x.reflect(b)} convention; {@code b} must be unit.
+     */
+    public Multivector reflect(Multivector reflector) {
+        check(reflector);
+        return reflector.gp(involution()).gp(reflector.reverse());
     }
 
     private boolean isE3() {

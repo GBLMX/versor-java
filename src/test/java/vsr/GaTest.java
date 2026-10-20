@@ -17,6 +17,7 @@ public final class GaTest {
         testUnaryOps();
         testCoords();
         testReverseAndDual();
+        testCppSemantics();
         testRotor();
         testSlerpAndLog();
         testStaBoostInterpolation();
@@ -114,6 +115,44 @@ public final class GaTest {
                 || e1.dual().distanceTo(Multivector.blade(E3.SIG, 0b110, 1)) < 1e-12);
         check("e1 ∧ dual(e1) = I", e1.op(e1.dual()).distanceTo(I) < 1e-12
                 || e1.op(e1.dual()).distanceTo(I.neg()) < 1e-12);
+    }
+
+    private static void testCppSemantics() {
+        Signature[] signatures = {
+                E3.SIG, P3.SIG, Conformal.SIG, Signature.sta(), Signature.cl(2, 1)
+        };
+        for (Signature sig : signatures) {
+            for (int m = 0; m < sig.size; m++) {
+                Multivector blade = Multivector.blade(sig, m, 1);
+                check("dual/undual round trip",
+                        blade.dual().undual().distanceTo(blade) < 1e-12);
+                check("undual/dual round trip",
+                        blade.undual().dual().distanceTo(blade) < 1e-12);
+            }
+        }
+
+        Multivector e1 = E3.vec(1, 0, 0);
+        Multivector e2 = E3.vec(0, 1, 0);
+        Multivector a = E3.vec(1, 2, 3);
+        Multivector b = E3.vec(4, 5, 6);
+        check("scalar product vector dot", Math.abs(a.scalarProduct(b) - 32) < 1e-12);
+        check("scalar product orthogonal", Math.abs(e1.scalarProduct(e2)) < 1e-12);
+        Multivector e12 = e1.gp(e2);
+        check("scalar product blade", Math.abs(e12.scalarProduct(e12) + 1) < 1e-12);
+
+        check("right division by vector",
+                a.divide(b).gp(b).distanceTo(a) < 1e-12);
+        Multivector rotor = E3.rotor(0, 0, 1, 0.7);
+        Multivector mixed = a.add(e12.scale(2));
+        check("right division by rotor",
+                mixed.divide(rotor).gp(rotor).distanceTo(mixed) < 1e-12);
+        check("division by zero rejected",
+                throwsArithmetic(() -> a.divide(Multivector.zero(E3.SIG))));
+
+        check("reflect e1 by e1", e1.reflect(e1).distanceTo(e1.neg()) < 1e-12);
+        check("reflect e2 by e1", e2.reflect(e1).distanceTo(e2) < 1e-12);
+        check("reflect e3 by e1",
+                E3.vec(0, 0, 1).reflect(e1).distanceTo(E3.vec(0, 0, 1)) < 1e-12);
     }
 
     private static void testRotor() {
