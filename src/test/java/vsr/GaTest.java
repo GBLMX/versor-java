@@ -29,6 +29,7 @@ public final class GaTest {
         testWolframGolden();
         testMotorInterpolation();
         testConformal();
+        testSandwichFastPaths();
         System.out.println("OK: " + passed + " checks passed");
     }
 
@@ -440,6 +441,39 @@ public final class GaTest {
         check("CGA point at infinity rejected", throwsIllegal(() ->
                 Conformal.pointCoords(Conformal.point(1, 1, 1).add(
                         Multivector.blade(Conformal.SIG, 8, 1)))));
+    }
+
+    private static void testSandwichFastPaths() {
+        Random rnd = new Random(20251021);
+        double e3Error = 0;
+        double pgaError = 0;
+        for (int i = 0; i < 50; i++) {
+            Multivector rotor = Multivector.scalar(E3.SIG, rnd.nextDouble() * 2 - 1)
+                    .add(E3.bivector(rnd.nextDouble() * 2 - 1,
+                            rnd.nextDouble() * 2 - 1, rnd.nextDouble() * 2 - 1));
+            Multivector vector = E3.vec(rnd.nextDouble() * 2 - 1,
+                    rnd.nextDouble() * 2 - 1, rnd.nextDouble() * 2 - 1);
+            e3Error = Math.max(e3Error,
+                    rotor.sandwich(vector).distanceTo(rotor.gp(vector).gp(rotor.reverse())));
+
+            Multivector motor = Multivector.scalar(P3.SIG, rnd.nextDouble() * 2 - 1)
+                    .add(Multivector.blade(P3.SIG, 3, rnd.nextDouble() * 2 - 1))
+                    .add(Multivector.blade(P3.SIG, 5, rnd.nextDouble() * 2 - 1))
+                    .add(Multivector.blade(P3.SIG, 6, rnd.nextDouble() * 2 - 1))
+                    .add(Multivector.blade(P3.SIG, 9, rnd.nextDouble() * 2 - 1))
+                    .add(Multivector.blade(P3.SIG, 10, rnd.nextDouble() * 2 - 1))
+                    .add(Multivector.blade(P3.SIG, 12, rnd.nextDouble() * 2 - 1))
+                    .add(Multivector.blade(P3.SIG, 15, rnd.nextDouble() * 2 - 1));
+            Multivector point = Multivector.blade(P3.SIG, 7, rnd.nextDouble() * 2 - 1)
+                    .add(Multivector.blade(P3.SIG, 11, rnd.nextDouble() * 2 - 1))
+                    .add(Multivector.blade(P3.SIG, 13, rnd.nextDouble() * 2 - 1))
+                    .add(Multivector.blade(P3.SIG, 14,
+                            i % 5 == 0 ? 0 : rnd.nextDouble() * 2 - 1));
+            pgaError = Math.max(pgaError,
+                    motor.sandwich(point).distanceTo(motor.gp(point).gp(motor.reverse())));
+        }
+        check("E3 vector sandwich fast path", e3Error < 1e-12);
+        check("PGA point sandwich fast path", pgaError < 1e-12);
     }
 
     private static boolean throwsIllegal(Runnable runnable) {

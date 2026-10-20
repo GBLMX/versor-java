@@ -155,7 +155,7 @@ Multivector n = sphere.normal(0, 0);                // 单位法向 e1
 ./build.sh        # javac + 自带断言测试（无需 Maven/Gradle）
 ```
 
-`build.sh` 会编译 `src/main/java`，然后运行 `vsr.GaTest`（167 项断言）。
+`build.sh` 会编译 `src/main/java`，然后运行 `vsr.GaTest`（183 项断言）。
 `build-blaze3d.sh` 额外编译 JOML 适配层并运行 `vsr.blaze3d.Blaze3DTest`（11 项断言）。
 示例：
 

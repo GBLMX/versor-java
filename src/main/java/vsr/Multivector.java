@@ -240,7 +240,109 @@ public final class Multivector {
 
     /** Sandwich product M x ~M (a transformation by the versor M). */
     public Multivector sandwich(Multivector x) {
+        check(x);
+        if (isE3() && onlyEvenGrades() && x.onlyBlades(1, 2, 4)) {
+            return sandwichE3Vector(x);
+        }
+        if (isPga3() && onlyEvenGrades() && x.onlyBlades(7, 11, 13, 14)) {
+            return sandwichPgaPoint(x);
+        }
         return gp(x).gp(reverse());
+    }
+
+    private boolean isE3() {
+        return sig.n == 3 && sig.metric[0] == 1 && sig.metric[1] == 1 && sig.metric[2] == 1;
+    }
+
+    private boolean isPga3() {
+        return sig.n == 4 && sig.metric[0] == 0 && sig.metric[1] == 1
+                && sig.metric[2] == 1 && sig.metric[3] == 1;
+    }
+
+    /** True when every odd-grade coefficient is zero. */
+    private boolean onlyEvenGrades() {
+        double[] arr = c;
+        for (int m = 1; m < arr.length; m++) {
+            if (arr[m] != 0 && (Integer.bitCount(m) & 1) != 0) return false;
+        }
+        return true;
+    }
+
+    private boolean onlyBlades(int m0, int m1, int m2) {
+        double[] arr = c;
+        for (int m = 0; m < arr.length; m++) {
+            if (m != m0 && m != m1 && m != m2 && arr[m] != 0) return false;
+        }
+        return true;
+    }
+
+    private boolean onlyBlades(int m0, int m1, int m2, int m3) {
+        double[] arr = c;
+        for (int m = 0; m < arr.length; m++) {
+            if (m != m0 && m != m1 && m != m2 && m != m3 && arr[m] != 0) return false;
+        }
+        return true;
+    }
+
+    /**
+     * Even E3 versor acting on a vector, unrolled from the symbolic sandwich.
+     * {@code b1}, {@code b2}, {@code b3} are the coefficients of e12, e13 and e23
+     * (masks 3, 5, 6), i.e. the implementation's ascending-blade basis.
+     */
+    private Multivector sandwichE3Vector(Multivector x) {
+        double s = c[0];
+        double b1 = c[3];
+        double b2 = c[5];
+        double b3 = c[6];
+        double vx = x.c[1];
+        double vy = x.c[2];
+        double vz = x.c[4];
+        double rx = (s * s - b1 * b1 - b2 * b2 + b3 * b3) * vx
+                + 2 * (b1 * (s * vy + b3 * vz) + b2 * (s * vz - b3 * vy));
+        double ry = (s * s - b1 * b1 + b2 * b2 - b3 * b3) * vy
+                + 2 * (-vx * (b1 * s + b2 * b3) + vz * (b3 * s - b1 * b2));
+        double rz = (s * s + b1 * b1 - b2 * b2 - b3 * b3) * vz
+                + 2 * (vx * (b1 * b3 - b2 * s) - vy * (b1 * b2 + b3 * s));
+        double[] r = new double[8];
+        r[1] = rx;
+        r[2] = ry;
+        r[4] = rz;
+        return new Multivector(sig, r);
+    }
+
+    /**
+     * Even PGA3 motor acting on a point {@code P = p7 e012 + p11 e013 + p13 e023 + p14 e123},
+     * unrolled from the symbolic sandwich.
+     */
+    private Multivector sandwichPgaPoint(Multivector x) {
+        double s = c[0];
+        double b01 = c[3];
+        double b02 = c[5];
+        double b12 = c[6];
+        double b03 = c[9];
+        double b13 = c[10];
+        double b23 = c[12];
+        double i = c[15];
+        double p7 = x.c[7];
+        double p11 = x.c[11];
+        double p13 = x.c[13];
+        double p14 = x.c[14];
+        double r7 = (s * s + b12 * b12 - b13 * b13 - b23 * b23) * p7
+                + 2 * (b12 * (b13 * p11 + b23 * p13) + s * (b23 * p11 - b13 * p13)
+                        + p14 * (i * b12 - b01 * b13 - b02 * b23 + b03 * s));
+        double r11 = (s * s - b12 * b12 + b13 * b13 - b23 * b23) * p11
+                + 2 * (b12 * (b13 * p7 + s * p13) + b13 * b23 * p13 - s * b23 * p7
+                        + p14 * (i * b13 + b01 * b12 - b02 * s - b03 * b23));
+        double r13 = (s * s - b12 * b12 - b13 * b13 + b23 * b23) * p13
+                + 2 * (b12 * (b23 * p7 - s * p11) + b13 * (b23 * p11 + s * p7)
+                        + p14 * (i * b23 + b01 * s + b02 * b12 + b03 * b13));
+        double r14 = (s * s + b12 * b12 + b13 * b13 + b23 * b23) * p14;
+        double[] r = new double[16];
+        r[7] = r7;
+        r[11] = r11;
+        r[13] = r13;
+        r[14] = r14;
+        return new Multivector(sig, r);
     }
 
     /**
