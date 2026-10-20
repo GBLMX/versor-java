@@ -164,7 +164,12 @@ Multivector n = sphere.normal(0, 0);                // 单位法向 e1
 BENCH_JAVA_OPTS="-XX:TieredStopAtLevel=1" ./bench.sh jit
 ```
 
-完整结果、环境与方法见 [`PERFORMANCE.md`](PERFORMANCE.md)。
+完整结果、环境与方法见 [`PERFORMANCE.md`](PERFORMANCE.md)；排版版本见
+[`PERFORMANCE.pdf`](PERFORMANCE.pdf)（R 生成表格与图，本地 XeLaTeX 编译）：
+
+```bash
+cd report && Rscript report.R    # 需要 R + xelatex + 思源宋体/黑体
+```
 
 ## 批量与矩阵
 

@@ -1,0 +1,16 @@
+path,op,ns
+E3,rotate,11.24
+JOML,rotateInPlace,5.56
+JOML,rotateAlloc,3.03
+E3,toQuaternion,143.39
+JOML,toE3Rotor,185.48
+E3,slerp,230.61
+JOML,slerpAlloc,50.18
+JOML,slerpInto,50.16
+P3,applyPoint,31.1
+P3,applyAndProject,31.36
+JOML,matrixTransformInPlace,4.17
+JOML,matrixTransformAlloc,2.34
+JOML,toMatrix4f,364.47
+JOML,fromMatrix4f,197.98
+JOML,adapterTransform,369.68

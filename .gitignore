@@ -10,3 +10,10 @@ build/
 run/
 *.log
 .idea/
+
+# Generated report intermediates
+report/performance.tex
+report/performance.pdf
+report/*.aux
+report/*.log
+report/*.out

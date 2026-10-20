@@ -1,0 +1,8 @@
+key,value
+cpu,"Intel Core i7-12700H (12th Gen, x86-64)"
+jdk,OpenJDK 25.0.3 (JBR-25.0.3+9-508.16)
+joml,JOML 1.10.9
+date,2026-10-21
+warmup,3
+rounds,5
+target,40 ms
