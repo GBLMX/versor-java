@@ -30,6 +30,7 @@ threshold <- read.csv("data/threshold.csv", stringsAsFactors = FALSE)
 sigtab <- read.csv("data/table.csv", stringsAsFactors = FALSE)
 batchscale <- read.csv("data/batchscale.csv", stringsAsFactors = FALSE)
 fuzz <- read.csv("data/fuzz.csv", stringsAsFactors = FALSE)
+submask <- read.csv("data/submask.csv", stringsAsFactors = FALSE)
 meta <- read.csv("data/meta.csv", stringsAsFactors = FALSE)
 meta_val <- function(key) meta$value[meta$key == key]
 
@@ -123,6 +124,19 @@ cairo_pdf("figures/fig-scale.pdf", width = 6.2, height = 3.6, family = CJK)
 plot(scale$threads, scale$points_per_sec / 1e6, type = "b", pch = 19, lwd = 2,
      col = "#1f5fa8", xlab = "线程数", ylab = "吞吐 (M 点/秒)",
      main = "批量 sandwich 的线程扩展（20 万点）")
+dev.off()
+
+cairo_pdf("figures/fig-submask.pdf", width = 6.2, height = 3.6, family = CJK)
+ops <- c("op", "ip", "rightContraction")
+cols <- c("#1f5fa8", "#b45309", "#3f7f5f")
+plot(NA, xlim = range(submask$n), ylim = c(1, max(submask$before / submask$after) * 1.2),
+     xlab = "代数维度 n", ylab = "加速比", main = "子掩码枚举：4^n → 3^n 配对")
+for (i in seq_along(ops)) {
+    d <- submask[submask$op == ops[i], ]
+    d <- d[order(d$n), ]
+    lines(d$n, d$before / d$after, type = "b", pch = 19, col = cols[i], lwd = 2)
+}
+legend("topleft", ops, pch = 19, col = cols, bty = "n")
 dev.off()
 
 cairo_pdf("figures/fig-threshold.pdf", width = 6.2, height = 3.8, family = CJK)
@@ -355,6 +369,15 @@ fuzz_table <- function() {
            paste(rows, collapse = "\n"), "\n\\bottomrule\n\\end{tabular}\n")
 }
 
+submask_table <- function() {
+    rows <- paste0(submask$n, " & \\texttt{", tex(submask$op), "} & ", fmt(submask$before),
+                   " & ", fmt(submask$after), " & ",
+                   sprintf("%.2f$\\times$", submask$before / submask$after), " \\\\")
+    paste0("\\begin{tabular}{rlrrr}\n\\toprule\n",
+           "n & 运算 & 修复前 ns & 修复后 ns & 提升 \\\\\n\\midrule\n",
+           paste(rows, collapse = "\n"), "\n\\bottomrule\n\\end{tabular}\n")
+}
+
 # --------------------------------------------------------------------- tex
 
 template <- paste(readLines("template.tex", warn = FALSE), collapse = "\n")
@@ -376,6 +399,7 @@ template <- fill(template, "%%SIGTAB%%", sigtab_table())
 template <- fill(template, "%%BATCHSCALE%%", batchscale_table())
 template <- fill(template, "%%BATCHSCALEFIG%%", batchscale_fig_table())
 template <- fill(template, "%%FUZZ%%", fuzz_table())
+template <- fill(template, "%%SUBMASK%%", submask_table())
 template <- fill(template, "%%PAIRS%%", pair_table())
 template <- fill(template, "%%CLIFF%%", cliff_table())
 template <- fill(template, "%%BATCH%%", batch_table())

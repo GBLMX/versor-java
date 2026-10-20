@@ -35,6 +35,7 @@ public final class GaTest {
         testMatrixInverse();
         testSandwichFastPaths();
         testSparse();
+        testSubmaskProducts();
         System.out.println("OK: " + passed + " checks passed");
     }
 
@@ -602,6 +603,48 @@ public final class GaTest {
         expected.set(0, 0, Multivector.scalar(E3.SIG, 0.5));
         expected.set(1, 1, Multivector.scalar(E3.SIG, 0.25));
         check("matrix scalar inverse", known.inverse().distanceTo(expected) < 1e-12);
+    }
+
+    private static void testSubmaskProducts() {
+        Random rnd = new Random(99);
+        for (int n = 3; n <= 8; n++) {
+            Signature sig = Signature.euclidean(n);
+            Multivector a = randomDense(sig, rnd);
+            Multivector b = randomDense(sig, rnd);
+            Multivector op = a.op(b);
+            Multivector ip = a.ip(b);
+            Multivector rc = a.rightContraction(b);
+            double[] rop = new double[sig.size];
+            double[] rip = new double[sig.size];
+            double[] rrc = new double[sig.size];
+            for (int i = 0; i < sig.size; i++) {
+                for (int j = 0; j < sig.size; j++) {
+                    int sign = sig.bladeProductSign(i, j);
+                    if (sign == 0) continue;
+                    double v = sign * a.get(i) * b.get(j);
+                    if ((i & j) == 0) rop[i ^ j] += v;
+                    if ((i & j) == i) rip[i ^ j] += v;
+                    if ((i & j) == j) rrc[i ^ j] += v;
+                }
+            }
+            double opErr = 0;
+            double ipErr = 0;
+            double rcErr = 0;
+            for (int m = 0; m < sig.size; m++) {
+                opErr = Math.max(opErr, Math.abs(op.get(m) - rop[m]));
+                ipErr = Math.max(ipErr, Math.abs(ip.get(m) - rip[m]));
+                rcErr = Math.max(rcErr, Math.abs(rc.get(m) - rrc[m]));
+            }
+            check("submask op n=" + n, opErr < 1e-12);
+            check("submask ip n=" + n, ipErr < 1e-12);
+            check("submask rc n=" + n, rcErr < 1e-12);
+        }
+    }
+
+    private static Multivector randomDense(Signature sig, Random rnd) {
+        double[] c = new double[sig.size];
+        for (int i = 0; i < c.length; i++) c[i] = rnd.nextDouble() * 2 - 1;
+        return new Multivector(sig, c);
     }
 
     private static void testSparse() {

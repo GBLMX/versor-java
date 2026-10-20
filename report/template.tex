@@ -231,6 +231,24 @@ Minkowski 未覆盖。
 double 与 BigDecimal 参考（系数约 $10^8$）的相对误差为 $8.6\times10^{-11}$；
 E3 double 转子与 JOML float 四元数的最大差为 $5.0\times10^{-5}$。
 
+\section{子掩码乘积（$4^n \to 3^n$）}
+%%SUBMASK%%
+
+外积、左缩并、右缩并的有效配对都只占全部配对的 $3^n/4^n$：
+外积要求 $a\wedge b$ 的 blade 不重叠，左缩并要求 $a$ 的支撑是 $b$ 的子集，
+右缩并反之。旧实现对每个 $a$ 扫描全部 $4^n$ 个 $b$ 再做位与判断；
+现在按兼容性枚举子掩码，只访问有效配对，复杂度降到 $3^n$。
+这与二叉树递归方法在外积上得到的 $O(3^d)$ 是同一个组合事实。
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.74\textwidth]{figures/fig-submask.pdf}
+\caption{子掩码枚举相对全扫描的加速比。}\label{fig:submask}
+\end{figure}
+
+n=10 时外积 633 $\mu$s $\to$ 77 $\mu$s（8.2$\times$），左/右缩并同量级；
+n=8 为 5.6$\times$，n=3 为 1.6$\times$。几何积仍需访问全部配对，
+保持不变；依赖外积的 \texttt{vee}、P3 平面/直线求交随之受益。
+
 \section{建议}
 \begin{enumerate}
 \item 几何积的 $4^n$ 稠密循环是唯一值得继续研究的算法瓶颈；单对成本已接近常数，

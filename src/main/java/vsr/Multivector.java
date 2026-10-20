@@ -115,39 +115,48 @@ public final class Multivector {
         return new Multivector(sig, r);
     }
 
-    /** Outer (wedge) product. */
+    /** Outer (wedge) product. Enumerates disjoint blades: O(3^n) pairs. */
     public Multivector op(Multivector o) {
         check(o);
         double[] r = new double[c.length];
         int[][] signs = sig.signTable();
+        int full = sig.fullMask();
         for (int a = 0; a < c.length; a++) {
             double ca = c[a];
             if (ca == 0) continue;
             int[] row = signs != null ? signs[a] : null;
-            for (int b = 0; b < c.length; b++) {
+            int comp = full ^ a;
+            for (int b = comp; ; b = (b - 1) & comp) {
                 double cb = o.c[b];
-                if (cb == 0 || (a & b) != 0) continue;
-                int sign = row != null ? row[b] : sig.computeBladeProductSign(a, b);
-                if (sign != 0) r[a ^ b] += sign * ca * cb;
+                if (cb != 0) {
+                    int sign = row != null ? row[b] : sig.computeBladeProductSign(a, b);
+                    if (sign != 0) r[a ^ b] += sign * ca * cb;
+                }
+                if (b == 0) break;
             }
         }
         return new Multivector(sig, r);
     }
 
-    /** Left contraction: A ⌋ B, selecting blades with basis(A) ⊆ basis(B). */
+    /** Left contraction A ⌋ B. Enumerates supersets of A: O(3^n) pairs. */
     public Multivector ip(Multivector o) {
         check(o);
         double[] r = new double[c.length];
         int[][] signs = sig.signTable();
+        int full = sig.fullMask();
         for (int a = 0; a < c.length; a++) {
             double ca = c[a];
             if (ca == 0) continue;
             int[] row = signs != null ? signs[a] : null;
-            for (int b = 0; b < c.length; b++) {
+            int comp = full ^ a;
+            for (int sub = comp; ; sub = (sub - 1) & comp) {
+                int b = a | sub;
                 double cb = o.c[b];
-                if (cb == 0 || (a & b) != a) continue;
-                int sign = row != null ? row[b] : sig.computeBladeProductSign(a, b);
-                if (sign != 0) r[a ^ b] += sign * ca * cb;
+                if (cb != 0) {
+                    int sign = row != null ? row[b] : sig.computeBladeProductSign(a, b);
+                    if (sign != 0) r[sub] += sign * ca * cb;
+                }
+                if (sub == 0) break;
             }
         }
         return new Multivector(sig, r);
@@ -158,7 +167,7 @@ public final class Multivector {
         return dual().op(o.dual()).dual();
     }
 
-    /** Right contraction A ⌊ B: selects blades with basis(B) ⊆ basis(A). */
+    /** Right contraction A ⌊ B. Enumerates subsets of A: O(3^n) pairs. */
     public Multivector rightContraction(Multivector o) {
         check(o);
         double[] r = new double[c.length];
@@ -167,11 +176,13 @@ public final class Multivector {
             double ca = c[a];
             if (ca == 0) continue;
             int[] row = signs != null ? signs[a] : null;
-            for (int b = 0; b < c.length; b++) {
+            for (int b = a; ; b = (b - 1) & a) {
                 double cb = o.c[b];
-                if (cb == 0 || (a & b) != b) continue;
-                int sign = row != null ? row[b] : sig.computeBladeProductSign(a, b);
-                if (sign != 0) r[a ^ b] += sign * ca * cb;
+                if (cb != 0) {
+                    int sign = row != null ? row[b] : sig.computeBladeProductSign(a, b);
+                    if (sign != 0) r[a ^ b] += sign * ca * cb;
+                }
+                if (b == 0) break;
             }
         }
         return new Multivector(sig, r);
