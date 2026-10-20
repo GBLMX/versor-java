@@ -24,7 +24,7 @@ case "$MODE" in
     fi
     javac --release 17 -Xlint:all,-classfile -cp "$JOML_JAR" -d out-bench \
         $(find src/main/java src/blaze3d/java src/bench/java -name '*.java')
-    $JAVA ${BENCH_JAVA_OPTS:-} -Xmx4g -cp "out-bench:$JOML_JAR" vsr.RenderBench
+    $JAVA ${BENCH_JAVA_OPTS:-} -Xmx4g -cp "out-bench:$JOML_JAR" vsr.RenderBench "$@"
     exit 0 ;;
   jmh)
     exec ./bench-jmh.sh "$@" ;;

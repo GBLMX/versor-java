@@ -18,8 +18,8 @@ import vsr.blaze3d.Blaze3D;
  */
 public final class RenderBench {
     public static void main(String[] args) throws Exception {
-        int n = 200_000;
-        int frames = 300;
+        int n = args.length > 0 ? Integer.parseInt(args[0]) : 200_000;
+        int frames = args.length > 1 ? Integer.parseInt(args[1]) : 300;
         Random rnd = new Random(11);
         Multivector[] points = new Multivector[n];
         Vector3f[] vectors = new Vector3f[n];
@@ -51,10 +51,11 @@ public final class RenderBench {
             }
             return sum;
         });
-        frame("adapter", Math.min(frames, 30), Math.min(n, 20_000), f -> {
+        int adapterN = Math.min(n, 100_000);
+        frame("adapter", frames, adapterN, f -> {
             Multivector motor = spin(base, f, frames);
             double sum = 0;
-            for (int i = 0; i < Math.min(n, 20_000); i++) {
+            for (int i = 0; i < adapterN; i++) {
                 sum += Blaze3D.transform(motor, vectors[i], scratch).x;
             }
             return sum;
@@ -114,6 +115,10 @@ public final class RenderBench {
                 P3.motor(P3.rotor(0, 0, 1, -0.2), P3.translator(0.05, 0, 0))
         };
         int solverIters = 20_000;
+        for (int i = 0; i < 5_000; i++) {
+            Multivector p = P3.point(0, 0, 0);
+            for (Multivector motor : chain) p = motor.sandwich(p);
+        }
         t0 = System.nanoTime();
         for (int i = 0; i < solverIters; i++) {
             Multivector p = P3.point(0, 0, 0);
