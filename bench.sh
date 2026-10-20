@@ -33,6 +33,11 @@ case "$MODE" in
         src/bench/java/vsr/MultiCoreBench.java
     $JAVA ${BENCH_JAVA_OPTS:-} -Xmx8g -cp out-bench vsr.MultiCoreBench
     exit 0 ;;
+  support)
+    javac --release 17 -d out-bench $(find src/main/java -name '*.java') \
+        src/bench/java/vsr/GaBench.java src/bench/java/vsr/GpSupportBench.java
+    $JAVA ${BENCH_JAVA_OPTS:-} -cp out-bench vsr.GpSupportBench
+    exit 0 ;;
   robust)
     javac --release 17 -d out-bench $(find src/main/java -name '*.java') \
         src/bench/java/vsr/GaBench.java src/bench/java/vsr/SparseRobustBench.java

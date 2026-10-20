@@ -19,3 +19,12 @@ report/*.log
 report/*.out
 bench-jmh/lib/
 out-jmh/
+
+# Report 2.0 intermediates
+report/performance2.tex
+report/performance2.pdf
+report/performance2.aux
+report/performance2.log
+report/performance2.out
+report/__pycache__/
+report/figures2/

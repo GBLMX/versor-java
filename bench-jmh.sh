@@ -16,4 +16,4 @@ fetch commons-math3-3.6.1.jar org/apache/commons/commons-math3/3.6.1
 CP="bench-jmh/lib/jmh-core-1.37.jar:bench-jmh/lib/jopt-simple-5.0.4.jar:bench-jmh/lib/commons-math3-3.6.1.jar"
 javac --release 17 -cp "$CP" -processorpath "$CP:bench-jmh/lib/jmh-generator-annprocess-1.37.jar" \
     -d out-jmh $(find src/main/java src/jmh/java -name '*.java')
-java ${BENCH_JAVA_OPTS:-} -Xmx4g -cp "out-jmh:$CP" org.openjdk.jmh.Main "$@"
+${JAVA:-java} ${BENCH_JAVA_OPTS:-} -Xmx4g -cp "out-jmh:$CP" org.openjdk.jmh.Main "$@"

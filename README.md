@@ -29,6 +29,21 @@ API 语义参考 `versor`（C++，`/home/wangwenjie/Documents/代码库/versor`�
 - `Manifold`：参数化曲线/曲面，切刃与法向
 - 不包含：versor 的绘图/App 层，CGA 的 conic/cyclide/tangent 等高级形态
 
+## 架构
+
+| 层 | 类型 | 表示与职责 |
+|---|---|---|
+| 代数 | `Signature` | 度量、blade 位掩码、grade、乘积符号；所有操作数必须共享同一实例 |
+| 稠密 | `Multivector` | 按 mask 索引的 `double[2^n]`；`gp` 自适应选择稠密循环或非零支撑对 |
+| 稀疏 | `SparseMultivector` | COO `(mask, value)`；按规模在哈希/稠密累加器间切换 |
+| 批量 | `MultivectorBatch` | SoA 按 blade 连续存储；`sandwich(versor,out)` 复用输出，`slice` 分块 |
+| 矩阵 | `MultivectorMatrix` | 多向量矩阵乘/转置/Gauss-Jordan 求逆 |
+| 模型 | `E3` / `P3` / `Conformal` | 向量、转子、motor、点/面/线及 fast path |
+| 运动 | `Motion` / `Field` / `Calculus` / `Manifold` | twist 运动学、场微分、参数化流形 |
+
+不变量：blade 按整数 mask 排序；零度量生成元的平方为 0；n≤10 使用惰性符号表，
+n=11–14 按需计算符号。批量和矩阵操作要求形状与签名一致。
+
 ## 约定（务必对齐）
 
 PGA3 基序为 `e0, e1, e2, e3`，其中 `e0² = 0`，`e1² = e2² = e3² = 1`。
@@ -168,6 +183,7 @@ Multivector n = sphere.normal(0, 0);                // 单位法向 e1
 ./bench.sh              # 全量
 ./bench.sh sweep        # 维度扫描
 ./bench.sh sparse       # 高维稀疏 n=8–14
+./bench.sh support      # 稠密数组上的稀疏支撑快速路径
 ./bench.sh render       # 端到端/并发/机器人（需要 JOML）
 ./bench.sh robust       # 结构化/混合密度/策略交叉/符号表
 ./bench.sh batchscale   # 分配 vs 复用、线程与块大小
@@ -177,6 +193,7 @@ Multivector n = sphere.normal(0, 0);                // 单位法向 e1
 # 生成的 JSON 可直接交给 ga-benchmark 的 gabm.py
 ./bench.sh jmh 'JmhDense' -prof gc
 ./bench.sh jmh 'JmhFast' -t 1
+./bench-all.sh          # 全套矩阵（测试、sweep、sparse、robust、render、批量、fuzz、多核、JMH、ga-benchmark）
 BENCH_JAVA_OPTS="-XX:TieredStopAtLevel=1" ./bench.sh jit
 ```
 
@@ -184,7 +201,9 @@ BENCH_JAVA_OPTS="-XX:TieredStopAtLevel=1" ./bench.sh jit
 [`PERFORMANCE.pdf`](PERFORMANCE.pdf)（R 生成表格与图，本地 XeLaTeX 编译）：
 
 ```bash
-cd report && Rscript report.R    # 需要 R + xelatex + 思源宋体/黑体
+cd report
+python3 import_log.py /tmp/full-new.log
+Rscript report2.R                 # 需要 R + xelatex + 思源宋体/黑体
 ```
 
 ## 批量与矩阵

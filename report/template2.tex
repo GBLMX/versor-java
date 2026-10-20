@@ -1,0 +1,209 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage{fontspec}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage[colorlinks=true,linkcolor=blue!45!black,urlcolor=blue!45!black]{hyperref}
+\setmainfont{Source Han Serif CN}
+\setsansfont{Source Han Sans CN}
+\setmonofont{DejaVu Sans Mono}[Scale=0.9]
+\XeTeXlinebreaklocale "zh"
+\XeTeXlinebreakskip = 0pt plus 1pt
+\geometry{margin=2.2cm}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.35em}
+\renewcommand{\arraystretch}{1.08}
+\title{\sffamily\bfseries versor-java 2.0\\[0.3em]\large 架构、稠密/稀疏乘积与端到端性能}
+\author{\sffamily 几何代数核心 · 纯数学，无 Minecraft 依赖}
+\date{%%DATE%%}
+\begin{document}
+\maketitle
+
+\section{摘要}
+%%SUMMARY%%
+
+\section{架构与不变量}
+库保持单包、分层明确，不引入运行时框架：
+
+\begin{center}\small
+\begin{tabular}{lll}
+\toprule
+层 & 类型 & 职责 \\
+\midrule
+代数 & \texttt{Signature} & 度量、位掩码 blade、grade、乘积/平方/反转符号 \\
+稠密 & \texttt{Multivector} & 按 mask 的系数数组；$4^n$ 内核 + 稀疏支撑快速路径 \\
+稀疏 & \texttt{SparseMultivector} & COO；哈希/稠密累加器按规模切换 \\
+批量 & \texttt{MultivectorBatch} & SoA；输出复用、分块切片 \\
+矩阵 & \texttt{MultivectorMatrix} & 多向量矩阵乘/转置/Gauss--Jordan 求逆 \\
+模型 & \texttt{E3}/\texttt{P3}/\texttt{Conformal} & 向量、转子、motor、点线面与快捷公式 \\
+运动 & \texttt{Motion}/\texttt{Field}/\texttt{Calculus}/\texttt{Manifold} & twist、场微分、参数化流形 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+不变量：所有操作数共享同一 \texttt{Signature} 实例；blade 按 mask 排序；零度量
+生成元平方为零；$n\le10$ 惰性构建符号表，$n=11$--$14$ 按需计算符号。
+2.0 将反转/共轭/对合符号与 blade 平方符号收敛到 \texttt{Signature}，
+消除了稀疏、稠密、批量三处的重复实现。
+
+\section{方法}
+环境：%%CPU%%；%%JDK%%；JOML %%JOMLVERSION%%。每个测量点自动校准到约
+%%TARGET%%，预热 %%WARMUP%% 轮、取 %%ROUNDS%% 轮最小值；JMH 使用 1.37，
+3 轮预热 + 4 轮测量。除多核一节外均为单线程、非隔离环境，绝对纳秒有
+$\pm10\%$ 抖动。完整矩阵由 \texttt{bench-all.sh} 一次运行，原始日志与 CSV 在
+\texttt{report/data}。
+
+\section{稠密乘积内核}
+%%SWEEP%%
+
+几何积 \texttt{gp} 仍是唯一的 $4^n$ 热点：n=10 约 %%GP10%% ms，
+每对 blade 约 %%PAIR10%% ns。图 \ref{fig:gp} 给出维度扫描与 $4^n$ 参考。
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.78\textwidth]{figures2/fig-gp.pdf}
+\caption{稠密 \texttt{gp} 随维度增长；虚线为 $4^n$ 参考。}\label{fig:gp}
+\end{figure}
+
+\textbf{压力场景与独立复核。} 稠密 sandwich 与通用逆在高维迅速压过 \texttt{gp}；
+JMH 1.37 的单线程结果与手写 harness 一致（差异 $<10\%$），说明测得的
+纳秒不是校准循环的假象。
+
+%%STRESS%%
+
+%%JMH%%
+
+%%FAST%%
+
+\textbf{稀疏支撑。} \texttt{Multivector.gp} 现在先统计两侧非零数：当
+$4\,n_a n_b < 4^n$ 时只遍历非零支撑对，否则走原稠密循环。PGA motor 乘点
+%%P3GP%% ns、E3 rotor 乘向量 %%E3GP%% ns；Cl(10) 中 10 个非零系数时
+%%SUPPORT10%% $\mu$s，而稠密为 %%GP10%% ms。
+
+%%SUPPORT%%
+
+\textbf{子掩码枚举。} 外积、左/右缩并的有效配对只有 $3^n$ 个。旧实现对每个
+$a$ 扫描全部 $b$ 再判断；现在按兼容性枚举子掩码，复杂度降到 $3^n$。
+n=10 时外积 %%OP10%% $\mu$s（原 %%OP10OLD%% $\mu$s，%%OPGAIN%%$\times$）。
+
+%%SUBMASK%%
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.76\textwidth]{figures2/fig-submask.pdf}
+\caption{子掩码枚举相对全扫描的加速比。}\label{fig:submask}
+\end{figure}
+
+\section{高维稀疏与符号表}
+%%BIGSPARSE%%
+
+COO 表示把乘积循环降到 $k^2$；低密度用开放寻址，高密度用稠密累加。
+n=10、k=10（约 1\%）时 \texttt{gp} 为 %%SPARSE10%% $\mu$s，相对稠密
+%%GP10%% ms 约 %%SPARSEGAIN%%$\times$。n=14、k=512 的 \texttt{gp} 仍要约
+%%SPARSE14MS%% ms，\texttt{sandwich} 因中间结果稠密化到约 %%SAND14%% ms。
+$n\ge11$ 不分配整张符号表，乘积符号按需计算。
+
+%%THRESH%%
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.76\textwidth]{figures2/fig-threshold.pdf}
+\caption{n=14 的哈希/稠密累加交叉；虚线为自动选择。}\label{fig:threshold}
+\end{figure}
+
+%%SIGTAB%%
+
+结构化输入、混合密度与动态稀疏的结果见下表；sandwich 的退化来自中间
+结果而非输入本身。
+
+%%ROBUST%%
+
+\section{批量、内存与多核}
+%%BATCH%%
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.74\textwidth]{figures2/fig-batch.pdf}
+\caption{逐元素与 SoA 批量的每点成本。}\label{fig:batch}
+\end{figure}
+
+%%REUSE%%
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.66\textwidth]{figures2/fig-reuse.pdf}
+\caption{100 万点下分配与输出复用的每点成本。}\label{fig:reuse}
+\end{figure}
+
+%%MULTICORE%%
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.76\textwidth]{figures2/fig-multicore.pdf}
+\caption{多核加速比；虚线为线性扩展。}\label{fig:mc}
+\end{figure}
+
+\section{快速路径、端到端与机器人}
+%%JOML%%
+
+JOML 列是 float、单次调用，JIT 可能对标量运算做常量折叠或向量化，不能直接
+当作实际渲染成本；下面 1M 点的端到端表才是可比口径。
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.76\textwidth]{figures2/fig-joml.pdf}
+\caption{GA 与 JOML 的运算/转换成本。}\label{fig:joml}
+\end{figure}
+
+%%RENDER%%
+
+%%ROBOT%%
+
+\section{数值正确性与标准化}
+%%FUZZ%%
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.7\textwidth]{figures2/fig-cond.pdf}
+\caption{近奇异元素的逆残差。}\label{fig:cond}
+\end{figure}
+
+导出的 ga-benchmark JSON 含 397 个 benchmark、20 类算子，覆盖
+Euclidean/Homogeneous/Conformal 的 D=3/4 与 grade 维度；格式已被其
+\texttt{gabm.py} 读取。
+
+%%GABM%%
+
+\section{结论与路线}
+\begin{enumerate}
+\item \textbf{稠密 \texttt{gp} 不要继续微优化}：输出驱动与 FMA 变体实测更慢
+      （n=10 为 1.47--1.50 ms，同 harness 基线 0.93 ms）；现有行优先符号表循环最接近
+      硬件上限。真正的结构收益来自稀疏支撑（Cl(10) 少非零时数百倍）与
+      子掩码缩并（n=10 约 8$\times$）。
+\item \textbf{稀疏路径按中间密度设计}：gp 可扩展，sandwich 在高密度中间结果
+      下退化；下一步应实现三重积的直接展开与不平衡树剪枝，而不是继续调阈值。
+\item \textbf{批量受内存带宽限制}：复用输出把 1M 点从约 %%ALLOC1M%% 降到
+      %%REUSE1M%% ns/点、分配降为 0；4 线程达到平台，更多线程无收益。
+\item \textbf{端到端差距来自算法层}：缓存 \texttt{Matrix4f} 比通用 GA 快一个
+      数量级；固定公式应生成/展开专用内核（Gaigen/Gaalop/GATL 的共同结论）。
+\item \textbf{正确性}：稠密/稀疏逐位一致，子掩码与暴力参考一致；固定主元
+      阈值 1e-14 在近奇异时可能静默返回不精确的逆，调用方应检查残差。
+\end{enumerate}
+
+\section{参考资料}
+\begin{itemize}
+\item GA-Benchmark：\url{https://github.com/ga-developers/ga-benchmark}；本报告按其
+      Euclidean/Homogeneous/Conformal 算子集导出 JSON，沿用其 Model/D/Grade 维度。
+\item Gaigen 2、Gaalop、GATL：分别代表代码生成、符号展开与模板元编程三条
+      固定公式优化路线；端到端差距与它们的公开结果量级一致。
+\item JOML：\url{https://github.com/JOML-CI/JOML}，float 四元数与列主序矩阵对照。
+\item Macdonald, \emph{Linear and Geometric Algebra}、\emph{Vector and Geometric
+      Calculus}：转子约定、场微分与面积加权采样。
+\end{itemize}
+
+\section{复现与限制}
+\begin{verbatim}
+cd lib/versor-java
+./bench-all.sh                  # full test matrix
+cd report && Rscript report2.R  # rebuild this report
+\end{verbatim}
+
+限制：单机、非隔离、单线程为主；多核为 6P+8E/20 逻辑核；JOML 为 float；
+未启用 Java Vector API（incubator，Minecraft 启动参数不可控）；ga-benchmark
+仅覆盖 Euclidean D=3/4、Homogeneous/Conformal D=3。
+
+\end{document}

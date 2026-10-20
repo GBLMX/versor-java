@@ -1,0 +1,9 @@
+key,value
+date,2026-10-21
+cpu,12th Gen Intel(R) Core(TM) i7-12700H
+jdk,"openjdk version ""25.0.3"" 2026-04-21"
+joml,1.10.9
+checks,236
+target,40 ms
+warmup,3
+rounds,5
