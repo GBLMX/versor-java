@@ -171,6 +171,7 @@ Multivector n = sphere.normal(0, 0);                // 单位法向 e1
 ./bench.sh render       # 端到端/并发/机器人（需要 JOML）
 ./bench.sh robust       # 结构化/混合密度/策略交叉/符号表
 ./bench.sh batchscale   # 分配 vs 复用、线程与块大小
+./bench.sh multicore    # gp/op/batch/scalar 多核扩展
 ./bench.sh fuzz         # 稠密-稀疏/条件数/退化/精度（需要 JOML）
 ./bench.sh gabm         # 输出 ga-benchmark 可读 JSON（需要 JOML）
 # 生成的 JSON 可直接交给 ga-benchmark 的 gabm.py

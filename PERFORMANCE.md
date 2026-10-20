@@ -332,11 +332,13 @@ BENCH_JAVA_OPTS="-XX:TieredStopAtLevel=1" ./bench.sh jit   # C1 对照
 ./bench.sh batchscale
 ./bench.sh fuzz
 ./bench.sh gabm   # 生成 GABenchmark_versor-java.json
+./bench.sh multicore      # gp / op / batch / scalar 多核扩展
 ```
 
 ## 限制
 
-- 单机、单线程、非隔离环境；C 状态/频率缩放会带来 ±10% 抖动。
+- 除多核一节外为单线程；多核数据来自 6P+8E、20 逻辑核；非隔离环境，
+  C 状态/频率缩放会带来 ±10% 抖动。
 - 分配量来自线程 TLAB 计数，包含 JIT 预热尾部，适合比较数量级而非精确字节数。
 - JOML 使用 float，GA 使用 double；横向数字比较的是 API 成本与典型用途，
   不是同等精度下的纯算术吞吐。

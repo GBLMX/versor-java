@@ -46,7 +46,7 @@ JOML & %%JOMLVERSION%% \\
 每个测量点自动校准迭代次数，输入用固定种子随机生成；分配量取自线程分配计数
 （ThreadMXBean）。JIT 对照使用 \texttt{-XX:TieredStopAtLevel=1} 与默认 C2。
 本机非隔离环境，绝对纳秒存在 $\pm$10\% 抖动，跨行比较优先看比例。
-第 1--8 节使用自建 harness；高维稀疏、JMH 复核与端到端数据见第 9--10 节。
+第 1--8 节使用自建 harness；第 9--16 节为扩展测试（JMH、稀疏、批量、数值、多核）。
 
 \section{维度扫描}
 表 1 为稠密输入下各运算的单次耗时。图 1 与图 2 给出几何积的缩放：总时间按 $4^n$
@@ -282,11 +282,17 @@ n=8 为 5.6$\times$，n=3 为 1.6$\times$。几何积仍需访问全部配对，
 cd lib/versor-java
 ./bench.sh                 # full suite (adds JOML when found)
 ./bench.sh sweep           # dimension sweep only
+./bench.sh robust          # structured sparse, thresholds, sign table
+./bench.sh batchscale      # allocation vs output reuse, threads, blocks
+./bench.sh multicore       # gp / op / batch / scalar thread scaling
+./bench.sh fuzz            # dense-sparse, conditioning, precision
+./bench.sh gabm            # ga-benchmark JSON
 cd report && Rscript report.R   # rebuild PERFORMANCE.pdf
 \end{verbatim}
 
 \section{限制}
-单机、单线程、非隔离环境；分配量来自 TLAB 计数，适合比较数量级；JOML 为 float，
-不是同精度纯算术对比；未实现真实 SIMD（Java Vector API 仍为 incubator）。
+除第 16 节外为单线程；多核数据在 6P+8E、20 逻辑核上取得。非隔离环境，绝对纳秒
+有 ±10\% 抖动；分配量来自 TLAB 计数，适合比较数量级；JOML 为 float，不是同精度
+纯算术对比；未实现真实 SIMD（Java Vector API 仍为 incubator）。
 
 \end{document}
