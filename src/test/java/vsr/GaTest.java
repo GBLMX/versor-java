@@ -474,6 +474,12 @@ public final class GaTest {
                 arbitrary.gp(arbitrary.inverseGeneral()).distanceTo(one) < 1e-12);
         check("general inverse A^-1 * A = 1",
                 arbitrary.inverseGeneral().gp(arbitrary).distanceTo(one) < 1e-12);
+        Multivector divisor = Multivector.scalar(E3.SIG, 0.5)
+                .add(Multivector.blade(E3.SIG, 1, 0.5))
+                .add(Multivector.blade(E3.SIG, 2, 0.5))
+                .add(Multivector.blade(E3.SIG, 3, 0.5));
+        check("general inverse rejects zero divisors",
+                throwsArithmetic(divisor::inverseGeneral));
 
         Signature e8 = Signature.euclidean(8);
         Multivector ae = Multivector.blade(e8, 1, 1);
@@ -550,6 +556,14 @@ public final class GaTest {
         known.set(0, 1, Multivector.zero(E3.SIG));
         known.set(1, 0, Multivector.zero(E3.SIG));
         known.set(1, 1, Multivector.scalar(E3.SIG, 4));
+        MultivectorMatrix singular = new MultivectorMatrix(E3.SIG, 2, 2);
+        for (int r = 0; r < 2; r++) {
+            for (int c = 0; c < 2; c++) {
+                singular.set(r, c, Multivector.scalar(E3.SIG, 1));
+            }
+        }
+        check("singular matrix rejected", throwsArithmetic(singular::inverse));
+
         MultivectorMatrix expected = new MultivectorMatrix(E3.SIG, 2, 2);
         expected.set(0, 0, Multivector.scalar(E3.SIG, 0.5));
         expected.set(1, 1, Multivector.scalar(E3.SIG, 0.25));
@@ -587,6 +601,15 @@ public final class GaTest {
         }
         check("E3 vector sandwich fast path", e3Error < 1e-12);
         check("PGA point sandwich fast path", pgaError < 1e-12);
+    }
+
+    private static boolean throwsArithmetic(Runnable runnable) {
+        try {
+            runnable.run();
+            return false;
+        } catch (ArithmeticException e) {
+            return true;
+        }
     }
 
     private static boolean throwsIllegal(Runnable runnable) {

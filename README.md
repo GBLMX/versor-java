@@ -177,7 +177,7 @@ MultivectorMatrix inv = m.inverse();              // m.inverse() 要求方阵且
 ./build.sh        # javac + 自带断言测试（无需 Maven/Gradle）
 ```
 
-`build.sh` 会编译 `src/main/java`，然后运行 `vsr.GaTest`（199 项断言）。
+`build.sh` 会编译 `src/main/java`，然后运行 `vsr.GaTest`（201 项断言）。
 `build-blaze3d.sh` 额外编译 JOML 适配层并运行 `vsr.blaze3d.Blaze3DTest`（11 项断言）。
 示例：
 
