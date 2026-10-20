@@ -16,6 +16,8 @@ API 语义参考 `versor`（C++，`/home/wangwenjie/Documents/代码库/versor`�
 - `P3`（PGA3）：点/面/线、translator、motor、变换、平面/直线求交、
   motor 插值（旋转 slerp + 平移线性）
 - `Motion`：twist 定义的刚体运动，解析的位置/速度/加速度/jerk
+- `Field` / `Calculus`：多重向量场，∇F、方向导数、散度、旋度
+- `Manifold`：参数化曲线/曲面，切刃与法向
 - 不包含：versor 的绘图/App 层，CGA 的 conic/cyclide/tangent 等高级形态
 
 ## 约定（务必对齐）
@@ -116,7 +118,7 @@ Quaternionf q = Blaze3D.quaternion(rotor);        // E3/P3 rotor -> 四元数
 ./build.sh        # javac + 自带断言测试（无需 Maven/Gradle）
 ```
 
-`build.sh` 会编译 `src/main/java`，然后运行 `vsr.GaTest`（154 项断言）。
+`build.sh` 会编译 `src/main/java`，然后运行 `vsr.GaTest`（163 项断言）。
 `build-blaze3d.sh` 额外编译 JOML 适配层并运行 `vsr.blaze3d.Blaze3DTest`（11 项断言）。
 示例：
 
@@ -134,3 +136,5 @@ javac -cp out -d out examples/CubeDemo.java && java -cp out CubeDemo
 - motor：`T R` 作用顺序、逆、`translationOf`/`rotationOf`、插值中点
 - 运动学：旋转/平移/螺旋的解析位置、速度、加速度、jerk，并与位置差分、
   加速度差分交叉验证
+- 几何微积分：旋量场散度/旋度/∇F、标量场梯度、方向导数；平面/球面法向、
+  螺旋线切向

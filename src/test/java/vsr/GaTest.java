@@ -24,6 +24,7 @@ public final class GaTest {
         testPgaMotorComposition();
         testPgaIntersections();
         testKinematics();
+        testFieldsAndManifolds();
         testWolframGolden();
         testMotorInterpolation();
         System.out.println("OK: " + passed + " checks passed");
@@ -276,6 +277,37 @@ public final class GaTest {
                 (aPlus[1] - aMinus[1]) / (2 * h), (aPlus[2] - aMinus[2]) / (2 * h)};
         check("jerk matches finite difference",
                 near(gen.jerk(0.6, x, y, z), fd3, 1e-5));
+    }
+
+    private static void testFieldsAndManifolds() {
+        // F(x, y, z) = (-y, x, 0): divergence 0, curl 2 e3, nabla F = 2 e12
+        Field swirl = (x, y, z) -> E3.vec(-y, x, 0);
+        check("swirl divergence", Math.abs(Calculus.divergence(swirl, 1, 2, 3)) < 1e-6);
+        check("swirl curl", near(E3.coords(Calculus.curl(swirl, 1, 2, 3)),
+                new double[]{0, 0, 2}, 1e-6));
+        Multivector nablaF = Calculus.vectorDerivative(swirl, 1, 2, 3);
+        check("swirl vector derivative", Math.abs(nablaF.get(0b011) - 2) < 1e-6
+                && Math.abs(nablaF.scalarPart()) < 1e-6);
+
+        Field scalar = (x, y, z) -> Multivector.scalar(E3.SIG, x * x + 2 * y * y + 3 * z * z);
+        check("gradient", near(E3.coords(Calculus.gradient(scalar, 1, 2, 3)),
+                new double[]{2, 8, 18}, 1e-5));
+        check("directional", Math.abs(Calculus.directional(scalar, 1, 2, 3, 1, 0, 0).scalarPart() - 2) < 1e-5);
+
+        Manifold plane = Manifold.surface(u -> new double[]{u[0], u[1], 0});
+        check("plane normal", near(E3.coords(plane.normal(1, 2)), new double[]{0, 0, 1}, 1e-6));
+        check("plane tangent blade", Math.abs(plane.tangentBlade(1, 2).get(0b011) - 1) < 1e-9);
+
+        Manifold sphere = Manifold.surface(u -> new double[]{
+                2 * Math.cos(u[0]) * Math.cos(u[1]),
+                2 * Math.sin(u[0]) * Math.cos(u[1]),
+                2 * Math.sin(u[1])});
+        check("sphere normal", near(E3.coords(sphere.normal(0, 0)),
+                new double[]{1, 0, 0}, 1e-5));
+
+        Manifold helix = Manifold.curve(u -> new double[]{Math.cos(u[0]), Math.sin(u[0]), u[0]});
+        double s = 1 / Math.sqrt(2);
+        check("helix tangent", near(E3.coords(helix.tangent(0)), new double[]{0, s, s}, 1e-5));
     }
 
     private static boolean near(double[] a, double[] b) {
