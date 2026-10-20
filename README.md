@@ -112,6 +112,30 @@ Quaternionf q = Blaze3D.quaternion(rotor);        // E3/P3 rotor -> 四元数
 
 `Matrix4f` 按列主序（JOML 的 `m<col><row>`）；绕 z 轴 90° 时 `m01 = 1`、`m10 = -1`。
 
+## 场与流形（几何微积分）
+
+`Calculus.vectorDerivative` 直接计算
+
+\[ \nabla F = e_1\partial_1 F + e_2\partial_2 F + e_3\partial_3 F \]
+
+标量部分是散度，二矢量部分取对偶即旋度：
+
+```java
+Field swirl = (x, y, z) -> E3.vec(-y, x, 0);
+double div = Calculus.divergence(swirl, 0, 0, 0);   // 0
+Multivector curl = Calculus.curl(swirl, 0, 0, 0);   // 2 e3
+Multivector dv = Calculus.directional(scalarField, 1, 2, 3, 1, 0, 0);
+
+Manifold sphere = Manifold.surface(u -> new double[]{
+        2 * Math.cos(u[0]) * Math.cos(u[1]),
+        2 * Math.sin(u[0]) * Math.cos(u[1]),
+        2 * Math.sin(u[1])});
+Multivector n = sphere.normal(0, 0);                // 单位法向 e1
+```
+
+`Manifold.tangentBlade` 对曲线返回切向量、对曲面返回切二矢量；
+`normal` 只在曲面上定义，取切二矢量的对偶并归一化。
+
 ## 构建与测试
 
 ```bash
