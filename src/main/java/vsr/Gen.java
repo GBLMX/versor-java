@@ -38,7 +38,11 @@ public final class Gen {
             // any Euclidean unit bivector (path is ambiguous at 180 degrees)
             return s < 0 ? piBivector(rotor.sig) : b;
         }
-        double angle = Math.atan2(n, s);
+        // Euclidean bivectors close with atan2; boosts close with the rapidity
+        // r = acosh(cosh r), because (cosh r + B sinh r) is not periodic.
+        double angle = b.gp(b).scalarPart() > 1e-14
+                ? Math.log(s + n)
+                : Math.atan2(n, s);
         return b.scale(angle / n);
     }
 

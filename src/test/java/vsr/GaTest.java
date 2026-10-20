@@ -18,6 +18,7 @@ public final class GaTest {
         testReverseAndDual();
         testRotor();
         testSlerpAndLog();
+        testStaBoostInterpolation();
         testPgaPoint();
         testPgaTranslator();
         testPgaRotor();
@@ -126,6 +127,16 @@ public final class GaTest {
         check("exp(0) = 1",
                 Multivector.zero(E3.SIG).exp()
                         .distanceTo(Multivector.scalar(E3.SIG, 1)) < 1e-12);
+    }
+
+    private static void testStaBoostInterpolation() {
+        Signature sta = Signature.sta();
+        Multivector identity = Multivector.scalar(sta, 1);
+        Multivector boost = Multivector.blade(sta, 0b0011, 0.7); // 0.7 e0e1
+        Multivector rotor = Gen.expBivector(boost);
+        check("STA boost log", Gen.log(rotor).distanceTo(boost) < 1e-10);
+        check("STA boost slerp", Gen.slerp(identity, rotor, 0.5)
+                .distanceTo(Gen.expBivector(boost.scale(0.5))) < 1e-10);
     }
 
     private static void testPgaPoint() {
