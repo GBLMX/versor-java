@@ -8,7 +8,7 @@ public final class Multivector {
     public final Signature sig;
     private final double[] c;
 
-    private Multivector(Signature sig, double[] c) {
+    Multivector(Signature sig, double[] c) {
         this.sig = sig;
         this.c = c;
     }
@@ -45,6 +45,11 @@ public final class Multivector {
 
     public double[] toArray() {
         return c.clone();
+    }
+
+    /** Direct coefficient array for in-package consumers; must not be mutated. */
+    double[] coefficients() {
+        return c;
     }
 
     public double scalarPart() {
@@ -147,6 +152,33 @@ public final class Multivector {
         return dual().op(o.dual()).dual();
     }
 
+    /** Right contraction A ⌊ B: selects blades with basis(B) ⊆ basis(A). */
+    public Multivector rightContraction(Multivector o) {
+        check(o);
+        double[] r = new double[c.length];
+        for (int a = 0; a < c.length; a++) {
+            double ca = c[a];
+            if (ca == 0) continue;
+            for (int b = 0; b < c.length; b++) {
+                double cb = o.c[b];
+                if (cb == 0 || (a & b) != b) continue;
+                int sign = sig.bladeProductSign(a, b);
+                if (sign != 0) r[a ^ b] += sign * ca * cb;
+            }
+        }
+        return new Multivector(sig, r);
+    }
+
+    /** Commutator [A, B] = (AB - BA) / 2. */
+    public Multivector commutator(Multivector o) {
+        return gp(o).sub(o.gp(this)).scale(0.5);
+    }
+
+    /** Anticommutator {A, B} = (AB + BA) / 2. */
+    public Multivector anticommutator(Multivector o) {
+        return gp(o).add(o.gp(this)).scale(0.5);
+    }
+
     public Multivector reverse() {
         double[] r = new double[c.length];
         for (int m = 0; m < c.length; m++) {
@@ -232,10 +264,65 @@ public final class Multivector {
     }
 
     /** Inverse for elements with nonzero ~A A. */
+    /**
+     * Fast inverse for versors and blades, where {@code A ~A} is the scalar
+     * {@link #norm2()}. For arbitrary invertible multivectors use
+     * {@link #inverseGeneral()}.
+     */
     public Multivector inverse() {
         double n2 = norm2();
         if (n2 == 0) throw new ArithmeticException("element is not invertible");
         return reverse().divide(n2);
+    }
+
+    /**
+     * Inverse for an arbitrary invertible multivector, including elements
+     * whose reverse product is not scalar. Solves the linear system
+     * {@code A x = 1} on the coefficient space, costing {@code O(size^3)}
+     * scalar operations; {@link #inverse()} is the {@code O(size^2)} fast path
+     * for versors.
+     */
+    public Multivector inverseGeneral() {
+        int n = c.length;
+        double[][] m = new double[n][n + 1];
+        for (int col = 0; col < n; col++) {
+            Multivector product = gp(new Multivector(sig, unitMask(col)));
+            for (int row = 0; row < n; row++) {
+                m[row][col] = product.get(row);
+            }
+        }
+        for (int row = 0; row < n; row++) {
+            m[row][n] = row == 0 ? 1 : 0;
+        }
+        for (int col = 0; col < n; col++) {
+            int pivot = col;
+            for (int row = col + 1; row < n; row++) {
+                if (Math.abs(m[row][col]) > Math.abs(m[pivot][col])) pivot = row;
+            }
+            if (Math.abs(m[pivot][col]) < 1e-14) {
+                throw new ArithmeticException("element is not invertible");
+            }
+            double[] swap = m[col];
+            m[col] = m[pivot];
+            m[pivot] = swap;
+            double p = m[col][col];
+            for (int j = col; j <= n; j++) m[col][j] /= p;
+            for (int row = 0; row < n; row++) {
+                if (row == col) continue;
+                double f = m[row][col];
+                if (f == 0) continue;
+                for (int j = col; j <= n; j++) m[row][j] -= f * m[col][j];
+            }
+        }
+        double[] r = new double[n];
+        for (int row = 0; row < n; row++) r[row] = m[row][n];
+        return new Multivector(sig, r);
+    }
+
+    private double[] unitMask(int mask) {
+        double[] v = new double[sig.size];
+        v[mask] = 1;
+        return v;
     }
 
     /** Sandwich product M x ~M (a transformation by the versor M). */

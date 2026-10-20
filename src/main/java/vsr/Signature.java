@@ -15,6 +15,10 @@ public final class Signature {
     public final int size;
     private final int full;
     private final int nameOffset;
+    /**
+     * Precomputed blade-product sign table. Built for up to eight generators
+     * (at most 256 KiB for Cl(8)); larger algebras compute signs on demand.
+     */
     private final int[][] productSign;
 
     private Signature(int nameOffset, int[] metric) {
@@ -31,7 +35,7 @@ public final class Signature {
                 throw new IllegalArgumentException("metric entries must be -1, 0 or 1");
             }
         }
-        if (n <= 5) {
+        if (n <= 8) {
             this.productSign = new int[size][size];
             for (int a = 0; a < size; a++) {
                 for (int b = 0; b < size; b++) {

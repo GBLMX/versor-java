@@ -10,8 +10,12 @@ API 语义参考 `versor`（C++，`/home/wangwenjie/Documents/代码库/versor`�
 ## 范围
 
 - 任意 `Cl(p,q,r)`，生成元 ≤ 10 个（$2^n$ 系数）
-- 多向量：几何积、外积、左缩并、回归积、reverse/conjugate/involution、
-  grade 投影、dual、范数、逆、指数（缩放平方和）
+- 多向量：几何积、外积、左/右缩并、回归积、交换子/反交换子、
+  reverse/conjugate/involution、grade 投影、dual、范数、逆（versor 快速路径
+  与任意可逆元素的通用求逆）、指数（缩放平方和）
+- `MultivectorBatch`：按 blade 连续存储的批量运算（gp / gpRight / sandwich /
+  reverse / 算术），避免逐元素对象分配
+- `MultivectorMatrix`：多向量矩阵乘、转置与 Gauss-Jordan 求逆
 - `E3`：向量、转子、旋转、slerp、log
 - `P3`（PGA3）：点/面/线、translator、motor、变换、平面/直线求交、
   motor 插值（旋转 slerp + 平移线性）
@@ -149,13 +153,31 @@ Multivector n = sphere.normal(0, 0);                // 单位法向 e1
 
 本地书籍路径：`/home/wangwenjie/Documents/论文资料/books/`（不进仓库）。
 
+## 批量与矩阵
+
+```java
+// 批量:元素 i 只依赖输入 i,系数按 blade 连续存放
+MultivectorBatch batch = MultivectorBatch.of(
+        P3.point(1, 0, 0), P3.point(0, 1, 0), P3.point(0, 0, 1));
+MultivectorBatch moved = batch.sandwich(motor);   // motor * p * ~motor
+Multivector p1 = moved.get(1);
+
+// 多向量矩阵:乘法按几何积,求逆用左侧行变换 + 通用主元求逆
+MultivectorMatrix m = new MultivectorMatrix(P3.SIG, 3, 3);
+m.set(0, 0, P3.motor(P3.rotor(0, 0, 1, 0.5), P3.translator(1, 0, 0)));
+MultivectorMatrix inv = m.inverse();              // m.inverse() 要求方阵且可逆
+```
+
+`MultivectorBatch` 的运算复杂度是 `O(4^n · count)`;`MultivectorMatrix.inverse()`
+对每个主元调用 `inverseGeneral()`(系数空间 `O(8^n)`),适合中小规模压力测试。
+
 ## 构建与测试
 
 ```bash
 ./build.sh        # javac + 自带断言测试（无需 Maven/Gradle）
 ```
 
-`build.sh` 会编译 `src/main/java`，然后运行 `vsr.GaTest`（183 项断言）。
+`build.sh` 会编译 `src/main/java`，然后运行 `vsr.GaTest`（199 项断言）。
 `build-blaze3d.sh` 额外编译 JOML 适配层并运行 `vsr.blaze3d.Blaze3DTest`（11 项断言）。
 示例：
 

@@ -29,6 +29,9 @@ public final class GaTest {
         testWolframGolden();
         testMotorInterpolation();
         testConformal();
+        testDerivedBinaryOps();
+        testBatch();
+        testMatrixInverse();
         testSandwichFastPaths();
         System.out.println("OK: " + passed + " checks passed");
     }
@@ -441,6 +444,116 @@ public final class GaTest {
         check("CGA point at infinity rejected", throwsIllegal(() ->
                 Conformal.pointCoords(Conformal.point(1, 1, 1).add(
                         Multivector.blade(Conformal.SIG, 8, 1)))));
+    }
+
+    private static void testDerivedBinaryOps() {
+        Random rnd = new Random(99);
+        Multivector a = E3.rotor(1, 2, 3, 0.4).add(E3.vec(0.1, -0.2, 0.3));
+        Multivector b = E3.rotor(-2, 1, 0.5, -0.8).add(E3.bivector(0.2, 0.1, -0.3));
+        check("commutator + anticommutator = geometric product",
+                a.commutator(b).add(a.anticommutator(b)).distanceTo(a.gp(b)) < 1e-12);
+
+        Multivector e1 = E3.vec(1, 0, 0);
+        Multivector e2 = E3.vec(0, 1, 0);
+        Multivector e12 = E3.bivector(0, 0, 1);
+        check("right contraction e12 ⌊ e1 = -e2",
+                e12.rightContraction(e1).distanceTo(E3.vec(0, -1, 0)) < 1e-12);
+        check("right contraction e1 ⌊ e2 = 0", e1.rightContraction(e2).maxAbs() < 1e-12);
+        check("right contraction e1 ⌊ e1 = 1",
+                e1.rightContraction(e1).distanceTo(Multivector.scalar(E3.SIG, 1)) < 1e-12);
+        check("right contraction e1 ⌊ e12 = 0", e1.rightContraction(e12).maxAbs() < 1e-12);
+
+        Multivector arbitrary = Multivector.scalar(E3.SIG, 1.3)
+                .add(E3.vec(0.4, -0.2, 0.7))
+                .add(E3.bivector(0.1, 0.3, -0.2));
+        Multivector one = Multivector.scalar(E3.SIG, 1);
+        Multivector rr = arbitrary.gp(arbitrary.reverse());
+        check("general inverse needs non-scalar reverse product",
+                rr.sub(Multivector.scalar(E3.SIG, rr.scalarPart())).maxAbs() > 1e-6);
+        check("general inverse A * A^-1 = 1",
+                arbitrary.gp(arbitrary.inverseGeneral()).distanceTo(one) < 1e-12);
+        check("general inverse A^-1 * A = 1",
+                arbitrary.inverseGeneral().gp(arbitrary).distanceTo(one) < 1e-12);
+
+        Signature e8 = Signature.euclidean(8);
+        Multivector ae = Multivector.blade(e8, 1, 1);
+        Multivector be = Multivector.blade(e8, 2, 1);
+        check("Cl(8) sign table", ae.gp(be).distanceTo(be.gp(ae).neg()) < 1e-12);
+        Signature e9 = Signature.euclidean(9);
+        Multivector a9 = Multivector.blade(e9, 0b111111111, 1);
+        check("Cl(9) on-demand product",
+                a9.gp(a9).distanceTo(Multivector.scalar(e9, 1)) < 1e-12);
+    }
+
+    private static void testBatch() {
+        Random rnd = new Random(2026);
+        Multivector[] points = new Multivector[257];
+        for (int i = 0; i < points.length; i++) {
+            points[i] = P3.point(rnd.nextDouble() * 4 - 2,
+                    rnd.nextDouble() * 4 - 2, rnd.nextDouble() * 4 - 2);
+        }
+        Multivector motor = P3.motor(P3.rotor(0.3, -0.7, 0.2, 0.9),
+                P3.translator(1.5, -2.5, 0.75));
+        MultivectorBatch batch = MultivectorBatch.of(points);
+        MultivectorBatch transformed = batch.sandwich(motor);
+        double err = 0;
+        for (int i = 0; i < points.length; i++) {
+            err = Math.max(err, transformed.get(i).distanceTo(motor.sandwich(points[i])));
+        }
+        check("batch sandwich matches per-element", err < 1e-12);
+
+        MultivectorBatch left = batch.gp(motor);
+        MultivectorBatch right = batch.gpRight(motor);
+        MultivectorBatch rev = batch.reverse();
+        MultivectorBatch sum = batch.add(batch).scale(0.5);
+        err = 0;
+        for (int i = 0; i < points.length; i++) {
+            err = Math.max(err, left.get(i).distanceTo(motor.gp(points[i])));
+            err = Math.max(err, right.get(i).distanceTo(points[i].gp(motor)));
+            err = Math.max(err, rev.get(i).distanceTo(points[i].reverse()));
+            err = Math.max(err, sum.get(i).distanceTo(points[i]));
+        }
+        check("batch products, reverse and arithmetic", err < 1e-12);
+
+        Multivector[] vectors = new Multivector[64];
+        for (int i = 0; i < vectors.length; i++) {
+            vectors[i] = E3.vec(rnd.nextDouble(), rnd.nextDouble(), rnd.nextDouble());
+        }
+        MultivectorBatch rotated = MultivectorBatch.of(vectors).sandwich(
+                E3.rotor(0.5, -1, 2, 1.1));
+        Multivector rotor = E3.rotor(0.5, -1, 2, 1.1);
+        err = 0;
+        for (int i = 0; i < vectors.length; i++) {
+            err = Math.max(err, rotated.get(i).distanceTo(rotor.sandwich(vectors[i])));
+        }
+        check("batch E3 rotation matches per-element", err < 1e-12);
+    }
+
+    private static void testMatrixInverse() {
+        Random rnd = new Random(7);
+        MultivectorMatrix id = MultivectorMatrix.identity(P3.SIG, 3);
+        MultivectorMatrix m = new MultivectorMatrix(P3.SIG, 3, 3);
+        for (int r = 0; r < 3; r++) {
+            for (int c = 0; c < 3; c++) {
+                m.set(r, c, P3.motor(
+                        P3.rotor(rnd.nextDouble() - 0.5, rnd.nextDouble() - 0.5,
+                                rnd.nextDouble() - 0.5, rnd.nextDouble() * 2),
+                        P3.translator(rnd.nextDouble(), rnd.nextDouble(), rnd.nextDouble())));
+            }
+        }
+        MultivectorMatrix inv = m.inverse();
+        check("matrix A * A^-1 = I", m.multiply(inv).distanceTo(id) < 1e-9);
+        check("matrix A^-1 * A = I", inv.multiply(m).distanceTo(id) < 1e-9);
+
+        MultivectorMatrix known = new MultivectorMatrix(E3.SIG, 2, 2);
+        known.set(0, 0, Multivector.scalar(E3.SIG, 2));
+        known.set(0, 1, Multivector.zero(E3.SIG));
+        known.set(1, 0, Multivector.zero(E3.SIG));
+        known.set(1, 1, Multivector.scalar(E3.SIG, 4));
+        MultivectorMatrix expected = new MultivectorMatrix(E3.SIG, 2, 2);
+        expected.set(0, 0, Multivector.scalar(E3.SIG, 0.5));
+        expected.set(1, 1, Multivector.scalar(E3.SIG, 0.25));
+        check("matrix scalar inverse", known.inverse().distanceTo(expected) < 1e-12);
     }
 
     private static void testSandwichFastPaths() {
