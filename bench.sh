@@ -28,6 +28,29 @@ case "$MODE" in
     exit 0 ;;
   jmh)
     exec ./bench-jmh.sh "$@" ;;
+  robust)
+    javac --release 17 -d out-bench $(find src/main/java -name '*.java') \
+        src/bench/java/vsr/GaBench.java src/bench/java/vsr/SparseRobustBench.java
+    $JAVA ${BENCH_JAVA_OPTS:-} -Xmx6g -cp out-bench vsr.SparseRobustBench
+    exit 0 ;;
+  batchscale)
+    javac --release 17 -d out-bench $(find src/main/java -name '*.java') \
+        src/bench/java/vsr/GaBench.java src/bench/java/vsr/BatchScalingBench.java
+    $JAVA ${BENCH_JAVA_OPTS:-} -Xmx10g -cp out-bench vsr.BatchScalingBench
+    exit 0 ;;
+  fuzz|gabm)
+    if [ -z "$JOML_JAR" ] || [ ! -f "$JOML_JAR" ]; then
+        echo "$MODE needs JOML for compile (set JOML_JAR)." >&2; exit 1
+    fi
+    javac --release 17 -cp "$JOML_JAR" -d out-bench $(find src/main/java -name '*.java') \
+        src/bench/java/vsr/GaBench.java src/bench/java/vsr/NumericalFuzz.java \
+        src/bench/java/vsr/GaBenchmarkJson.java
+    if [ "$MODE" = fuzz ]; then
+        $JAVA ${BENCH_JAVA_OPTS:-} -cp "out-bench:$JOML_JAR" vsr.NumericalFuzz
+    else
+        $JAVA ${BENCH_JAVA_OPTS:-} -cp "out-bench:$JOML_JAR" vsr.GaBenchmarkJson "$@"
+    fi
+    exit 0 ;;
 esac
 
 javac --release 17 -d out-bench $(find src/main/java -name '*.java') src/bench/java/vsr/GaBench.java

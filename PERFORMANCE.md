@@ -221,6 +221,68 @@ SoA 批量 16.2 ns/点，`inverseGeneral` 1.31 µs。分配：n=3 时 `gp` 80 B/
 4.8×）：每线程分配自己的结果数组，受内存带宽限制。机器人：3×3 P3 矩阵求逆
 74 µs，四段 motor 正运动学 265 ns。
 
+## 9. 第二轮：鲁棒性、复用与数值验证
+
+### 稀疏鲁棒性
+
+结构化输入（versor/PGA/CGA）在相同 k 下与均匀随机同量级，但 sandwich 会被
+中间结果稠密化：
+
+| n | 结构 | k | gp ns | sandwich ns |
+|---:|---|---:|---:|---:|
+| 10 | versor | 32 | 4,276 | 27,002 |
+| 10 | PGA point | 32 | 4,323 | 25,644 |
+| 12 | versor | 32 | 15,918 | 519,055 |
+| 12 | CGA point | 32 | 2,107 | 12,440 |
+| 14 | versor | 32 | 24,860 | 770,902 |
+
+混合密度（1000 次操作，10 个稠密元素）：n=10 均值从 2.0 µs 升到 49.7 µs；
+n=14（6% 稠密）为 490 µs，而全稀疏仅 2.9 µs。动态相乘 nnz 从 64 涨到约 500
+（n=10），时间 0.7 → 11 µs 后平台化；n=12 约 860 nnz、108 µs。
+n=14、k=512 的 gp 13–15 ms，sandwich 约 388 ms。
+
+策略阈值原为 `4k² < 2^n`，在 n=14、k=32 误选哈希（65.8 µs vs 稠密 27.9 µs）。
+改为符号表感知（n≤10 因子 4，n>10 因子 16）后该点选中稠密（28.1 µs）；
+仅剩 n=12、k=16 的 13% 边缘误判。
+
+符号表：n=10 首次构建 37 ms、4 MiB；8 线程并发首乘约 44 ms（锁串行）。
+n≥11 不建表，首次乘积 1–3 µs。
+
+稀疏 3×3 PGA 矩阵：稀疏转稠密再求逆 12.9 µs，与纯稠密 12.5 µs 持平，
+稀疏表示对通用矩阵求逆没有收益。
+
+### 批量输出复用
+
+新增 `MultivectorBatch.sandwich(versor, out)` 和 `slice(from,to)`：
+
+| N | 变体 | ns/点 | B/点 | GB/s |
+|---:|---|---:|---:|---:|
+| 100k | alloc | 29.7 | 128 | 8.6 |
+| 100k | reuse | 15.1 | 0 | 16.9 |
+| 1M | alloc | 50.4 | 128 | 5.1 |
+| 1M | reuse | 19.4 | 0 | 13.2 |
+| 10M | alloc | 43.1 | 128 | 5.9 |
+| 10M | reuse | 18.5 | 0 | 13.9 |
+| 1M | AoS 逐元素 | 35.2 | 168 | 7.3 |
+
+复用后 1M 点单线程 46 M 点/s，8 线程 105 M（2.3×），14 线程回落到 100 M；
+瓶颈从分配转为内存带宽（约 13.9 GB/s）。块 1k/10k/100k 为 18.7/19.0/28.7 ns/点；
+非对齐块（10001）无 false-sharing 惩罚。
+
+### 数值 Fuzz 与标准化
+
+- 稠密 vs 稀疏：n=4–10、100 组随机输入，gp/sandwich 误差 0（逐位一致）。
+- 输入顺序：`of` 排序后结果与顺序无关（误差 0）。
+- 条件数：以奇异幂等元为基准叠加 ε 噪声，残差从 2.4e-15（ε=1e-1）
+  升到 1.3e7（ε=1e-12），仍不抛异常；固定主元阈值 1e-14 不足以保证精度。
+- double vs BigDecimal（系数约 1e8）：相对误差 8.6e-11。
+- E3 double 转子 vs JOML float 四元数：最大差 5.0e-5。
+- 退化：PGA e0²=0、`norm2=0`、`inverse()` 抛异常，均符合预期。
+
+新增 `GaBenchmarkJson` 输出 Google Benchmark 形态 JSON（397 条，
+unary/binary、Euclidean D=3/4、Homogeneous D=3、Conformal D=3），
+命名已用 `gabm.py` 的解析函数验证；Minkowski 未覆盖。
+
 ## 复现
 
 ```bash
@@ -235,6 +297,10 @@ BENCH_JAVA_OPTS="-XX:TieredStopAtLevel=1" ./bench.sh jit   # C1 对照
 ./bench.sh render          # 端到端 / 并发 / 机器人（需要 JOML）
 ./bench.sh jmh 'JmhDense' -prof gc
 ./bench.sh jmh 'JmhFast' -t 1
+./bench.sh robust
+./bench.sh batchscale
+./bench.sh fuzz
+./bench.sh gabm   # 生成 GABenchmark_versor-java.json
 ```
 
 ## 限制

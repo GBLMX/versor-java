@@ -16,7 +16,8 @@ API 语义参考 `versor`（C++，`/home/wangwenjie/Documents/代码库/versor`�
   reverse/conjugate/involution、grade 投影、dual、范数、逆（versor 快速路径
   与任意可逆元素的通用求逆）、指数（缩放平方和）
 - `MultivectorBatch`：按 blade 连续存储的批量运算（gp / gpRight / sandwich /
-  reverse / 算术），避免逐元素对象分配
+  reverse / 算术），避免逐元素对象分配；`sandwich(versor, out)` 复用输出缓冲，
+  `slice(from,to)` 支持分块并行
 - `SparseMultivector`：COO（mask + value）表示，低密度积用哈希累加，
   高密度退回稠密累加器；适合 k≪2^n 的高维输入
 - `MultivectorMatrix`：多向量矩阵乘、转置与 Gauss-Jordan 求逆
@@ -168,6 +169,11 @@ Multivector n = sphere.normal(0, 0);                // 单位法向 e1
 ./bench.sh sweep        # 维度扫描
 ./bench.sh sparse       # 高维稀疏 n=8–14
 ./bench.sh render       # 端到端/并发/机器人（需要 JOML）
+./bench.sh robust       # 结构化/混合密度/策略交叉/符号表
+./bench.sh batchscale   # 分配 vs 复用、线程与块大小
+./bench.sh fuzz         # 稠密-稀疏/条件数/退化/精度（需要 JOML）
+./bench.sh gabm         # 输出 ga-benchmark 可读 JSON（需要 JOML）
+# 生成的 JSON 可直接交给 ga-benchmark 的 gabm.py
 ./bench.sh jmh 'JmhDense' -prof gc
 ./bench.sh jmh 'JmhFast' -t 1
 BENCH_JAVA_OPTS="-XX:TieredStopAtLevel=1" ./bench.sh jit

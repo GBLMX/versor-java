@@ -517,6 +517,30 @@ public final class GaTest {
             err = Math.max(err, transformed.get(i).distanceTo(motor.sandwich(points[i])));
         }
         check("batch sandwich matches per-element", err < 1e-12);
+        MultivectorBatch reused = new MultivectorBatch(motor.sig, points.length);
+        batch.sandwich(motor, reused);
+        double reuseErr = 0;
+        for (int i = 0; i < points.length; i++) {
+            reuseErr = Math.max(reuseErr,
+                    reused.get(i).distanceTo(transformed.get(i)));
+        }
+        check("batch sandwich output reuse", reuseErr < 1e-15);
+        Signature g = Signature.euclidean(4);
+        Multivector[] raw = new Multivector[5];
+        for (int i = 0; i < raw.length; i++) {
+            raw[i] = Multivector.blade(g, 3, 0.5).add(Multivector.blade(g, 12, -0.25))
+                    .add(Multivector.blade(g, 9, 0.1 * (i + 1)));
+        }
+        MultivectorBatch gb = MultivectorBatch.of(raw);
+        Multivector gm = Multivector.scalar(g, 1.1).add(Multivector.blade(g, 6, 0.3))
+                .add(Multivector.blade(g, 10, -0.2));
+        MultivectorBatch gout = new MultivectorBatch(g, raw.length);
+        gb.sandwich(gm, gout);
+        double gerr = 0;
+        for (int i = 0; i < raw.length; i++) {
+            gerr = Math.max(gerr, gout.get(i).distanceTo(gb.sandwich(gm).get(i)));
+        }
+        check("batch reuse general path", gerr < 1e-15);
 
         MultivectorBatch left = batch.gp(motor);
         MultivectorBatch right = batch.gpRight(motor);
@@ -605,6 +629,10 @@ public final class GaTest {
                 sa.sandwich(sb).toDense().distanceTo(da.sandwich(db)) < 1e-12);
         check("sparse norm2 matches dense",
                 Math.abs(sa.norm2() - da.norm2()) < 1e-12);
+        Multivector rotor = E3.rotor(0.3, -0.7, 0.2, 0.9);
+        SparseMultivector srotor = SparseMultivector.fromDense(rotor);
+        check("sparse versor inverse",
+                srotor.inverse().toDense().distanceTo(rotor.inverse()) < 1e-12);
 
         Signature high = Signature.euclidean(12);
         SparseMultivector e1 = SparseMultivector.of(high, new int[]{1}, new double[]{1});

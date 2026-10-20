@@ -92,13 +92,23 @@ public final class SparseMultivector {
     public SparseMultivector gp(SparseMultivector o) {
         check(o);
         long pairs = (long) masks.length * o.masks.length;
-        if (pairs * 4 < sig.size) {
+        // With a precomputed table the dense accumulator wins only once pairs
+        // approach 2^n/4; above n=10 signs cost more per pair, so prefer it earlier.
+        int hashFactor = sig.n <= 10 ? 4 : 16;
+        if (pairs * hashFactor < sig.size) {
             return gpHashed(o);
         }
         return gpDense(o);
     }
 
-    private SparseMultivector gpHashed(SparseMultivector o) {
+    /** Inverse of a versor: {@code ~A / (A ~A)}. */
+    public SparseMultivector inverse() {
+        double n2 = norm2();
+        if (n2 == 0) throw new ArithmeticException("element is not invertible");
+        return reverse().scale(1.0 / n2);
+    }
+
+    SparseMultivector gpHashed(SparseMultivector o) {
         int capacity = 16;
         while (capacity < Math.max(16, masks.length * o.masks.length * 2)) capacity <<= 1;
         int[] keys = new int[capacity];
@@ -151,7 +161,7 @@ public final class SparseMultivector {
     }
 
     /** Geometric product with a dense accumulator over the output support. */
-    private SparseMultivector gpDense(SparseMultivector o) {
+    SparseMultivector gpDense(SparseMultivector o) {
         int size = sig.size;
         double[] acc = new double[size];
         boolean[] seen = new boolean[size];

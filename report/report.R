@@ -25,6 +25,11 @@ jmh <- read.csv("data/jmh.csv", stringsAsFactors = FALSE)
 render <- read.csv("data/render.csv", stringsAsFactors = FALSE)
 scale <- read.csv("data/scale.csv", stringsAsFactors = FALSE)
 robot <- read.csv("data/robot.csv", stringsAsFactors = FALSE)
+robust <- read.csv("data/robust.csv", stringsAsFactors = FALSE)
+threshold <- read.csv("data/threshold.csv", stringsAsFactors = FALSE)
+sigtab <- read.csv("data/table.csv", stringsAsFactors = FALSE)
+batchscale <- read.csv("data/batchscale.csv", stringsAsFactors = FALSE)
+fuzz <- read.csv("data/fuzz.csv", stringsAsFactors = FALSE)
 meta <- read.csv("data/meta.csv", stringsAsFactors = FALSE)
 meta_val <- function(key) meta$value[meta$key == key]
 
@@ -118,6 +123,33 @@ cairo_pdf("figures/fig-scale.pdf", width = 6.2, height = 3.6, family = CJK)
 plot(scale$threads, scale$points_per_sec / 1e6, type = "b", pch = 19, lwd = 2,
      col = "#1f5fa8", xlab = "线程数", ylab = "吞吐 (M 点/秒)",
      main = "批量 sandwich 的线程扩展（20 万点）")
+dev.off()
+
+cairo_pdf("figures/fig-threshold.pdf", width = 6.2, height = 3.8, family = CJK)
+th <- threshold[threshold$n == 14, ]
+plot(th$k, th$hash_ns, log = "xy", type = "b", pch = 19, col = "#b45309", lwd = 2,
+     xlab = "非零数 k (对数轴)", ylab = "gp (ns, 对数轴)",
+     main = "n=14 策略交叉：哈希 vs 稠密累加")
+lines(th$k, th$dense_ns, type = "b", pch = 17, col = "#1f5fa8", lwd = 2)
+lines(th$k, th$auto_ns, type = "l", lty = 2, col = "grey30", lwd = 1.5)
+legend("topleft", c("哈希", "稠密累加", "自动选择"),
+       pch = c(19, 17, NA), lty = c(1, 1, 2), col = c("#b45309", "#1f5fa8", "grey30"), bty = "n")
+dev.off()
+
+cairo_pdf("figures/fig-cond.pdf", width = 6.2, height = 3.6, family = CJK)
+cd <- fuzz[fuzz$cat == "cond", ]
+plot(as.numeric(cd$a), pmax(cd$value, 1e-30), log = "xy", type = "b", pch = 19,
+     col = "#b45309", lwd = 2, xlab = "扰动 eps（对数轴）",
+     ylab = "残差 |A x - 1|（对数轴）",
+     main = "inverseGeneral 近奇异残差")
+dev.off()
+
+cairo_pdf("figures/fig-reuse.pdf", width = 6.2, height = 3.6, family = CJK)
+r1 <- batchscale[batchscale$section == "reuse" & batchscale$a == "1000000", ]
+par(mar = c(4, 7, 3, 1))
+barplot(rev(r1$ns), names.arg = rev(r1$b), horiz = TRUE, las = 1,
+        col = "#3f7f5f", xlab = "ns/点",
+        main = "100 万点：分配 vs 输出复用")
 dev.off()
 
 # ------------------------------------------------------------------- tables
@@ -266,6 +298,63 @@ robot_table <- function() {
            paste(rows, collapse = "\n"), "\n\\bottomrule\n\\end{tabular}\n")
 }
 
+robust_table <- function() {
+    pick <- robust[robust$k %in% c(8, 32) & robust$kind %in% c("uniform", "versor", "pgaPoint")
+        & robust$n %in% c(10, 12, 14), ]
+    rows <- vapply(seq_len(nrow(pick)), function(i) {
+        r <- pick[i, ]
+        sprintf("%d & \\texttt{%s} & %d & \\texttt{%s} & %s & %.0f \\\\", r$n, r$kind,
+                r$k, r$op, fmt(r$ns), r$p99)
+    }, "")
+    paste0("\\begin{tabular}{rlrlrr}\n\\toprule\n",
+           "n & 结构 & k & 运算 & ns & p99 ns \\\\\n\\midrule\n",
+           paste(rows, collapse = "\n"), "\n\\bottomrule\n\\end{tabular}\n")
+}
+
+threshold_table <- function() {
+    rows <- paste0(threshold$n, " & ", threshold$k, " & ", fmt(threshold$hash_ns), " & ",
+                   fmt(threshold$dense_ns), " & ", fmt(threshold$auto_ns), " & ",
+                   threshold$choice, " & ", threshold$correct, " \\\\")
+    paste0("\\begin{tabular}{rrrrrll}\n\\toprule\n",
+           "n & k & hash & dense & auto & 选择 & 判定 \\\\\n\\midrule\n",
+           paste(rows, collapse = "\n"), "\n\\bottomrule\n\\end{tabular}\n")
+}
+
+sigtab_table <- function() {
+    rows <- paste0(sigtab$n, " & ", sigtab$threads, " & ", sprintf("%.1f", sigtab$first_us),
+                   " & ", sprintf("%.1f", sigtab$rebuild_us), " & ",
+                   ifelse(sigtab$bytes == 0, "--", sprintf("%.1f MiB", sigtab$bytes / 1048576)),
+                   " \\\\")
+    paste0("\\begin{tabular}{rrrrl}\n\\toprule\n",
+           "n & 线程 & 首次乘积 us & 重建 us & 表内存 \\\\\n\\midrule\n",
+           paste(rows, collapse = "\n"), "\n\\bottomrule\n\\end{tabular}\n")
+}
+
+batchscale_table <- function() {
+    r1 <- batchscale[batchscale$section == "reuse", ]
+    rows <- paste0(r1$a, " & ", r1$b, " & ", fmt(r1$ns), " & ",
+                   sprintf("%.0f", r1$bytes), " & ", sprintf("%.1f", r1$extra), " \\\\")
+    paste0("\\begin{tabular}{rlrrr}\n\\toprule\n",
+           "N & 变体 & ns/点 & B/点 & GB/s \\\\\n\\midrule\n",
+           paste(rows, collapse = "\n"), "\n\\bottomrule\n\\end{tabular}\n")
+}
+
+batchscale_fig_table <- function() {
+    r1 <- batchscale[batchscale$section == "scale", ]
+    rows <- paste0(r1$a, " & ", sprintf("%.1f", r1$extra / 1e6), " & ",
+                   sprintf("%.2f", r1$ns), " \\\\")
+    paste0("\\begin{tabular}{rrr}\n\\toprule\n",
+           "线程 & M 点/秒 & ns/点 \\\\\n\\midrule\n",
+           paste(rows, collapse = "\n"), "\n\\bottomrule\n\\end{tabular}\n")
+}
+
+fuzz_table <- function() {
+    rows <- paste0("\\texttt{", tex(fuzz$cat), "} & ", tex(fuzz$a), " & ",
+                   sprintf("%.2e", fuzz$value), " \\\\")
+    paste0("\\begin{tabular}{llr}\n\\toprule\n类别 & 指标 & 值 \\\\\n\\midrule\n",
+           paste(rows, collapse = "\n"), "\n\\bottomrule\n\\end{tabular}\n")
+}
+
 # --------------------------------------------------------------------- tex
 
 template <- paste(readLines("template.tex", warn = FALSE), collapse = "\n")
@@ -281,6 +370,12 @@ template <- fill(template, "%%JMH%%", jmh_table())
 template <- fill(template, "%%RENDER%%", render_table())
 template <- fill(template, "%%SCALE%%", scale_table())
 template <- fill(template, "%%ROBOT%%", robot_table())
+template <- fill(template, "%%ROBUST%%", robust_table())
+template <- fill(template, "%%THRESHOLD%%", threshold_table())
+template <- fill(template, "%%SIGTAB%%", sigtab_table())
+template <- fill(template, "%%BATCHSCALE%%", batchscale_table())
+template <- fill(template, "%%BATCHSCALEFIG%%", batchscale_fig_table())
+template <- fill(template, "%%FUZZ%%", fuzz_table())
 template <- fill(template, "%%PAIRS%%", pair_table())
 template <- fill(template, "%%CLIFF%%", cliff_table())
 template <- fill(template, "%%BATCH%%", batch_table())

@@ -71,6 +71,19 @@ public final class MultivectorBatch {
         blades[mask][i] = value;
     }
 
+    /** Copies elements {@code [from, to)} into a new batch. */
+    public MultivectorBatch slice(int from, int to) {
+        if (from < 0 || to > count || from > to) {
+            throw new IndexOutOfBoundsException("slice " + from + ".." + to
+                    + " outside 0.." + count);
+        }
+        MultivectorBatch out = new MultivectorBatch(sig, to - from);
+        for (int m = 0; m < blades.length; m++) {
+            System.arraycopy(blades[m], from, out.blades[m], 0, to - from);
+        }
+        return out;
+    }
+
     public MultivectorBatch copy() {
         double[][] copy = new double[blades.length][count];
         for (int m = 0; m < blades.length; m++) {
@@ -140,20 +153,65 @@ public final class MultivectorBatch {
     public MultivectorBatch sandwich(Multivector versor) {
         checkSignature(versor);
         if (isE3() && evenOnly(versor) && onlyBlades(1, 2, 4)) {
-            return sandwichE3(versor);
+            return sandwichE3(versor, new double[sig.size][count]);
         }
         if (isPga3() && evenOnly(versor) && onlyBlades(7, 11, 13, 14)) {
-            return sandwichPga(versor);
+            return sandwichPga(versor, new double[sig.size][count]);
         }
         return gp(versor).gpRight(versor.reverse());
     }
 
-    private MultivectorBatch sandwichE3(Multivector versor) {
+    /**
+     * Writes {@code versor * element * ~versor} into {@code out} and returns it,
+     * reusing its coefficient arrays. The caller owns {@code out}; it must have
+     * the same signature and size and must not alias this batch.
+     */
+    public MultivectorBatch sandwich(Multivector versor, MultivectorBatch out) {
+        checkSignature(versor);
+        if (out.sig != sig || out.count != count) {
+            throw new IllegalArgumentException("batch shape mismatch");
+        }
+        out.clear();
+        if (isE3() && evenOnly(versor) && onlyBlades(1, 2, 4)) {
+            return sandwichE3(versor, out.blades);
+        }
+        if (isPga3() && evenOnly(versor) && onlyBlades(7, 11, 13, 14)) {
+            return sandwichPga(versor, out.blades);
+        }
+        double[] m = versor.coefficients();
+        double[] mr = versor.reverse().coefficients();
+        double[][] r = out.blades;
+        for (int a = 0; a < m.length; a++) {
+            if (m[a] == 0) continue;
+            for (int c = 0; c < mr.length; c++) {
+                if (mr[c] == 0) continue;
+                for (int b = 0; b < blades.length; b++) {
+                    if (!hasNonzero(blades[b])) continue;
+                    int mid = a ^ b;
+                    int sign = sig.bladeProductSign(a, b);
+                    if (sign == 0) continue;
+                    int sign2 = sig.bladeProductSign(mid, c);
+                    if (sign2 == 0) continue;
+                    double factor = m[a] * mr[c] * sign * sign2;
+                    double[] src = blades[b];
+                    double[] dst = r[mid ^ c];
+                    for (int i = 0; i < count; i++) dst[i] += factor * src[i];
+                }
+            }
+        }
+        return out;
+    }
+
+    /** Zeroes every coefficient of every element. */
+    public void clear() {
+        for (double[] row : blades) java.util.Arrays.fill(row, 0);
+    }
+
+    private MultivectorBatch sandwichE3(Multivector versor, double[][] r) {
         double s = versor.get(0);
         double b1 = versor.get(3);
         double b2 = versor.get(5);
         double b3 = versor.get(6);
-        double[][] r = new double[sig.size][count];
         double[] x = blades[1];
         double[] y = blades[2];
         double[] z = blades[4];
@@ -171,7 +229,7 @@ public final class MultivectorBatch {
         return new MultivectorBatch(sig, count, r);
     }
 
-    private MultivectorBatch sandwichPga(Multivector versor) {
+    private MultivectorBatch sandwichPga(Multivector versor, double[][] r) {
         double s = versor.get(0);
         double b01 = versor.get(3);
         double b02 = versor.get(5);
@@ -180,7 +238,6 @@ public final class MultivectorBatch {
         double b13 = versor.get(10);
         double b23 = versor.get(12);
         double ps = versor.get(15);
-        double[][] r = new double[sig.size][count];
         double[] p7 = blades[7];
         double[] p11 = blades[11];
         double[] p13 = blades[13];
