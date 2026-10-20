@@ -122,8 +122,31 @@ public final class Multivector {
 
     /** Geometric product. See {@link #mul(Multivector)} for the readable alias. */
     public Multivector gp(Multivector o) {
-        check(o);
         double[] r = new double[c.length];
+        gpAccumulate(o, r);
+        return new Multivector(sig, r);
+    }
+
+    /**
+     * Accumulates {@code this * o} into {@code out}; the caller must supply a
+     * zeroed coefficient array of the right length. Internal scheduling hook
+     * used by matrix products to avoid one intermediate multivector per term.
+     */
+    void gpAccumulate(Multivector o, double[] out) {
+        gpAccumulate(o, out, 1.0);
+    }
+
+    /**
+     * Accumulates {@code scale * (this * o)} into {@code out}. A scale of
+     * {@code -1} is used by matrix elimination to avoid a temporary product
+     * and subtraction.
+     */
+    void gpAccumulate(Multivector o, double[] out, double scale) {
+        if (scale == 0) return;
+        check(o);
+        if (out.length != c.length) {
+            throw new IllegalArgumentException("output length mismatch");
+        }
         int[][] signs = sig.signTable();
         int aCount = nonZeroCount(c);
         int bCount = nonZeroCount(o.c);
@@ -131,27 +154,26 @@ public final class Multivector {
             int[] ai = nonZeroIndices(c, aCount);
             int[] bi = nonZeroIndices(o.c, bCount);
             for (int ia : ai) {
-                double ca = c[ia];
+                double ca = scale * c[ia];
                 int[] row = signs != null ? signs[ia] : null;
                 for (int ib : bi) {
                     int sign = row != null ? row[ib] : sig.computeBladeProductSign(ia, ib);
-                    if (sign != 0) r[ia ^ ib] += sign * ca * o.c[ib];
+                    if (sign != 0) out[ia ^ ib] += sign * ca * o.c[ib];
                 }
             }
-            return new Multivector(sig, r);
+            return;
         }
         for (int a = 0; a < c.length; a++) {
-            double ca = c[a];
+            double ca = scale * c[a];
             if (ca == 0) continue;
             int[] row = signs != null ? signs[a] : null;
             for (int b = 0; b < c.length; b++) {
                 double cb = o.c[b];
                 if (cb == 0) continue;
                 int sign = row != null ? row[b] : sig.computeBladeProductSign(a, b);
-                if (sign != 0) r[a ^ b] += sign * ca * cb;
+                if (sign != 0) out[a ^ b] += sign * ca * cb;
             }
         }
-        return new Multivector(sig, r);
     }
 
     private static int nonZeroCount(double[] values) {

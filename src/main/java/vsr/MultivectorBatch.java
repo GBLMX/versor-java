@@ -181,16 +181,24 @@ public final class MultivectorBatch {
         double[] m = versor.coefficients();
         double[] mr = versor.reverse().coefficients();
         double[][] r = out.blades;
+        int[][] signs = sig.signTable();
+        boolean[] active = new boolean[blades.length];
+        for (int b = 0; b < active.length; b++) {
+            active[b] = hasNonzero(blades[b]);
+        }
         for (int a = 0; a < m.length; a++) {
             if (m[a] == 0) continue;
+            int[] row = signs != null ? signs[a] : null;
             for (int c = 0; c < mr.length; c++) {
                 if (mr[c] == 0) continue;
                 for (int b = 0; b < blades.length; b++) {
-                    if (!hasNonzero(blades[b])) continue;
+                    if (!active[b]) continue;
                     int mid = a ^ b;
-                    int sign = sig.bladeProductSign(a, b);
+                    int sign = row != null ? row[b] : sig.computeBladeProductSign(a, b);
                     if (sign == 0) continue;
-                    int sign2 = sig.bladeProductSign(mid, c);
+                    int[] midRow = signs != null ? signs[mid] : null;
+                    int sign2 = midRow != null ? midRow[c]
+                            : sig.computeBladeProductSign(mid, c);
                     if (sign2 == 0) continue;
                     double factor = m[a] * mr[c] * sign * sign2;
                     double[] src = blades[b];
@@ -257,11 +265,15 @@ public final class MultivectorBatch {
         double[] f = fixed.coefficients();
         double[][] r = new double[sig.size][count];
         int size = sig.size;
+        boolean[] active = new boolean[size];
+        for (int b = 0; b < size; b++) {
+            active[b] = hasNonzero(blades[b]);
+        }
         for (int a = 0; a < size; a++) {
             if (fixedLeft) {
                 if (f[a] == 0) continue;
                 for (int b = 0; b < size; b++) {
-                    if (!hasNonzero(blades[b])) continue;
+                    if (!active[b]) continue;
                     if (outer ? (a & b) != 0 : (a & b) != a) continue;
                     int sign = sig.bladeProductSign(a, b);
                     if (sign == 0) continue;
@@ -269,7 +281,7 @@ public final class MultivectorBatch {
                     addScaled(r[a ^ b], blades[b], factor);
                 }
             } else {
-                if (!hasNonzero(blades[a])) continue;
+                if (!active[a]) continue;
                 for (int b = 0; b < size; b++) {
                     if (f[b] == 0) continue;
                     if (outer ? (a & b) != 0 : (a & b) != a) continue;

@@ -783,6 +783,18 @@ public final class GaTest {
         MultivectorMatrix tiny = known.scale(1e-20);
         check("matrix inverse is scale invariant",
                 tiny.inverse().distanceTo(expected.scale(1e20)) / 1e20 < 1e-12);
+
+        MultivectorMatrix left = new MultivectorMatrix(E3.SIG, 2, 2);
+        MultivectorMatrix right = new MultivectorMatrix(E3.SIG, 2, 2);
+        left.set(0, 0, E3.vec(1, 0, 0));
+        left.set(1, 1, E3.vec(0, 1, 0));
+        right.set(0, 0, E3.vec(0, 1, 0));
+        right.set(1, 1, E3.vec(1, 0, 0));
+        MultivectorMatrix product = left.multiply(right);
+        Multivector e12 = E3.bivector(0, 0, 1);
+        check("matrix product preserves left-to-right order",
+                product.get(0, 0).distanceTo(e12) < 1e-12
+                        && product.get(1, 1).distanceTo(e12.neg()) < 1e-12);
     }
 
     private static void testSubmaskProducts() {

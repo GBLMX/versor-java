@@ -89,14 +89,23 @@ public final class MultivectorMatrix {
         if (o.sig != sig || cols != o.rows) {
             throw new IllegalArgumentException("matrix shape mismatch");
         }
+        // i-k-j order: the left factor is loaded once per (row, k), and the
+        // shared dense product core accumulates into one coefficient array per
+        // result cell. This replaces the previous per-k Multivector sum.
+        double[][][] acc = new double[rows][o.cols][sig.size];
+        for (int r = 0; r < rows; r++) {
+            for (int k = 0; k < cols; k++) {
+                Multivector left = entries[r][k];
+                if (left.isZero(0)) continue;
+                for (int c = 0; c < o.cols; c++) {
+                    left.gpAccumulate(o.entries[k][c], acc[r][c]);
+                }
+            }
+        }
         MultivectorMatrix m = new MultivectorMatrix(sig, rows, o.cols);
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < o.cols; c++) {
-                Multivector sum = Multivector.zero(sig);
-                for (int k = 0; k < cols; k++) {
-                    sum = sum.add(entries[r][k].gp(o.entries[k][c]));
-                }
-                m.entries[r][c] = sum;
+                m.entries[r][c] = new Multivector(sig, acc[r][c]);
             }
         }
         return m;
@@ -167,7 +176,9 @@ public final class MultivectorMatrix {
                 Multivector factor = aug[r][col];
                 if (factor.isZero(0)) continue;
                 for (int c = 0; c < 2 * n; c++) {
-                    aug[r][c] = aug[r][c].sub(factor.gp(aug[col][c]));
+                    double[] dst = aug[r][c].coefficients().clone();
+                    factor.gpAccumulate(aug[col][c], dst, -1.0);
+                    aug[r][c] = new Multivector(sig, dst);
                 }
             }
         }

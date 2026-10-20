@@ -21,7 +21,8 @@ API 语义参考 `versor`（C++，`/home/wangwenjie/Documents/代码库/versor`�
   `sandwich(versor, out)` 复用输出缓冲，`slice(from,to)` 支持分块并行
 - `SparseMultivector`：COO（mask + value）表示，低密度积用哈希累加，
   高密度退回稠密累加器；适合 k≪2^n 的高维输入
-- `MultivectorMatrix`：多向量矩阵乘、转置与 Gauss-Jordan 求逆
+- `MultivectorMatrix`：多向量矩阵乘（i-k-j，复用稠密乘积累加器）、转置与
+  Gauss-Jordan 求逆
 - `E3`：向量、转子、旋转、slerp、log
 - `P3`（PGA3）：点/面/线、translator、motor、变换、平面/直线求交、
   线方向/矩/锚点、点到线/面距离、最近点、平面投影、motor 插值
@@ -39,12 +40,14 @@ API 语义参考 `versor`（C++，`/home/wangwenjie/Documents/代码库/versor`�
 | 稠密 | `Multivector` | 按 mask 索引的 `double[2^n]`；`gp` 自适应选择稠密循环或非零支撑对 |
 | 稀疏 | `SparseMultivector` | COO `(mask, value)`；按规模在哈希/稠密累加器间切换 |
 | 批量 | `MultivectorBatch` | SoA 按 blade 连续存储；`sandwich(versor,out)` 复用输出，`slice` 分块 |
-| 矩阵 | `MultivectorMatrix` | 多向量矩阵乘/转置/Gauss-Jordan 求逆 |
+| 矩阵 | `MultivectorMatrix` | i-k-j 多向量矩阵乘、转置、Gauss-Jordan 求逆 |
 | 模型 | `E3` / `P3` / `Conformal` | 向量、转子、motor、点/面/线及 fast path |
 | 运动 | `Motion` / `Field` / `Calculus` / `Manifold` | twist 运动学、场微分、参数化流形 |
 
 不变量：blade 按整数 mask 排序；零度量生成元的平方为 0；n≤10 使用惰性符号表，
 n=11–14 按需计算符号。批量和矩阵操作要求形状与签名一致。
+
+内核分派与统一分析见 [`docs/KERNEL_SCHEDULING.md`](docs/KERNEL_SCHEDULING.md)。
 
 ## 约定（务必对齐）
 
@@ -302,7 +305,7 @@ Multivector.GeneralInverse info = a.inverseGeneralResult(); // 不抛，读 resi
 ./build.sh        # javac + 自带断言测试（无需 Maven/Gradle）
 ```
 
-`build.sh` 会编译 `src/main/java`，然后运行 `vsr.GaTest`（453 项断言）。
+`build.sh` 会编译 `src/main/java`，然后运行 `vsr.GaTest`（454 项断言）。
 `build-blaze3d.sh` 额外编译 JOML 适配层并运行 `vsr.blaze3d.Blaze3DTest`（11 项断言）。
 示例：
 
