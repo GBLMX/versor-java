@@ -305,6 +305,15 @@ public final class GaTest {
         check("sphere normal", near(E3.coords(sphere.normal(0, 0)),
                 new double[]{1, 0, 0}, 1e-5));
 
+        check("plane jacobian", Math.abs(plane.jacobian(1, 2) - 1) < 1e-9);
+        check("sphere jacobian", Math.abs(sphere.jacobian(0, 0) - 4) < 1e-4);
+
+        Field radial = (x, y, z) -> E3.vec(x, y, z);
+        check("sphere flux", Math.abs(Calculus.flux(radial, sphere,
+                0, 2 * Math.PI, -Math.PI / 2, Math.PI / 2, 128, 64) - 32 * Math.PI) < 0.05);
+        Field up = (x, y, z) -> E3.vec(0, 0, 1);
+        check("plane flux", Math.abs(Calculus.flux(up, plane, 0, 1, 0, 1, 16, 16) - 1) < 1e-9);
+
         Manifold helix = Manifold.curve(u -> new double[]{Math.cos(u[0]), Math.sin(u[0]), u[0]});
         double s = 1 / Math.sqrt(2);
         check("helix tangent", near(E3.coords(helix.tangent(0)), new double[]{0, s, s}, 1e-5));

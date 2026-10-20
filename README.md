@@ -135,6 +135,8 @@ Multivector n = sphere.normal(0, 0);                // 单位法向 e1
 
 `Manifold.tangentBlade` 对曲线返回切向量、对曲面返回切二矢量；
 `normal` 只在曲面上定义，取切二矢量的对偶并归一化。
+`jacobian` 给出曲线速度 / 曲面面积元，`Calculus.flux` 用中点法算
+\(\int F\cdot n\,dS\)，这是粒子按面积加权采样的基础。
 
 ## 参考资料
 
@@ -153,7 +155,7 @@ Multivector n = sphere.normal(0, 0);                // 单位法向 e1
 ./build.sh        # javac + 自带断言测试（无需 Maven/Gradle）
 ```
 
-`build.sh` 会编译 `src/main/java`，然后运行 `vsr.GaTest`（163 项断言）。
+`build.sh` 会编译 `src/main/java`，然后运行 `vsr.GaTest`（167 项断言）。
 `build-blaze3d.sh` 额外编译 JOML 适配层并运行 `vsr.blaze3d.Blaze3DTest`（11 项断言）。
 示例：
 
@@ -172,4 +174,4 @@ javac -cp out -d out examples/CubeDemo.java && java -cp out CubeDemo
 - 运动学：旋转/平移/螺旋的解析位置、速度、加速度、jerk，并与位置差分、
   加速度差分交叉验证
 - 几何微积分：旋量场散度/旋度/∇F、标量场梯度、方向导数；平面/球面法向、
-  螺旋线切向
+  螺旋线切向；面积元与通量积分（球面通量 = 4πR³）

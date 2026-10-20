@@ -58,6 +58,11 @@ public final class Manifold {
         return t.op(partial(u, 1));
     }
 
+    /** Jacobian: speed for a curve, area element for a surface. */
+    public double jacobian(double... u) {
+        return dimension == 1 ? partial(u, 0).norm() : tangentBlade(u).norm();
+    }
+
     /** Unit normal of a surface (dual of the tangent bivector). */
     public Multivector normal(double... u) {
         if (dimension != 2) throw new IllegalStateException("normal is defined for surfaces");

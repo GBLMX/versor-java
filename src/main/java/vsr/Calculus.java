@@ -64,6 +64,28 @@ public final class Calculus {
         return vectorDerivative(f, x, y, z).scalarPart();
     }
 
+    /** Flux of a vector field through a parameterized surface (midpoint rule). */
+    public static double flux(Field f, Manifold surface,
+                              double u0, double u1, double v0, double v1,
+                              int nu, int nv) {
+        if (surface.dimension() != 2) throw new IllegalArgumentException("flux needs a surface");
+        if (nu < 1 || nv < 1) throw new IllegalArgumentException("need at least one cell");
+        double du = (u1 - u0) / nu;
+        double dv = (v1 - v0) / nv;
+        double sum = 0;
+        for (int i = 0; i < nu; i++) {
+            double u = u0 + (i + 0.5) * du;
+            for (int j = 0; j < nv; j++) {
+                double v = v0 + (j + 0.5) * dv;
+                double[] p = surface.point(u, v);
+                Multivector field = f.at(p);
+                Multivector normal = surface.normal(u, v);
+                sum += field.ip(normal).scalarPart() * surface.jacobian(u, v) * du * dv;
+            }
+        }
+        return sum;
+    }
+
     /** Curl of a vector field: the vector dual of the bivector part, -I (nabla ^ F). */
     public static Multivector curl(Field f, double x, double y, double z) {
         Multivector bivector = vectorDerivative(f, x, y, z).grade(2);
