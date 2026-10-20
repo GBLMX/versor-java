@@ -136,6 +136,17 @@ Multivector n = sphere.normal(0, 0);                // 单位法向 e1
 `Manifold.tangentBlade` 对曲线返回切向量、对曲面返回切二矢量；
 `normal` 只在曲面上定义，取切二矢量的对偶并归一化。
 
+## 参考资料
+
+| 来源 | 用途 | 采用情况 |
+|---|---|---|
+| Alan Macdonald, *Linear and Geometric Algebra* (2010)，中文译本 | 转子 \(R=e^{-B\theta/2}\)、旋转/反射、复合与插值（第 7 章） | 用于 `E3`/`P3`/`Gen` 的符号与手性校验 |
+| Alan Macdonald, *Vector and Geometric Calculus* (2012) | 微分、方向导数、向量导数、线/面积分（第 3、5、7、9 章） | `Calculus` 的 \(\nabla F\)、散度、旋度；扫掠与面积加权采样 |
+| [jeremyong/klein](https://github.com/jeremyong/klein)（MIT，已归档） | PGA 标量参考、测试黄金值、SIMD lane 布局 | 参考符号表/展开思路；**未复制代码**；Panama Vector 不用于模组 |
+| [MozillaFiredoge/Aerodynamics4MC-Core](https://github.com/MozillaFiredoge/Aerodynamics4MC-Core)（MIT） | 薄入口、服务端权威、量化同步、粒子风场 | 采用架构模式；**未复制代码** |
+
+本地书籍路径：`/home/wangwenjie/Documents/论文资料/books/`（不进仓库）。
+
 ## 构建与测试
 
 ```bash
