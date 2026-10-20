@@ -28,6 +28,7 @@ public final class GaTest {
         testFieldsAndManifolds();
         testWolframGolden();
         testMotorInterpolation();
+        testConformal();
         System.out.println("OK: " + passed + " checks passed");
     }
 
@@ -403,6 +404,51 @@ public final class GaTest {
             if (rnd.nextBoolean()) m = m.add(Multivector.blade(sig, i, rnd.nextGaussian()));
         }
         return m;
+    }
+
+    private static void testConformal() {
+        Multivector p = Conformal.point(1, 2, 3);
+        check("CGA point is null", Math.abs(Conformal.dot(p, p)) < 1e-9);
+        double[] coords = Conformal.pointCoords(p);
+        check("CGA point roundtrip",
+                Math.abs(coords[0] - 1) < 1e-9
+                        && Math.abs(coords[1] - 2) < 1e-9
+                        && Math.abs(coords[2] - 3) < 1e-9);
+        check("CGA distance squared",
+                Math.abs(Conformal.distanceSq(
+                        Conformal.point(1, 2, 3), Conformal.point(4, 6, 3)) - 25.0) < 1e-9);
+
+        Multivector sphere = Conformal.sphere(1, 1, 1, 2);
+        check("CGA sphere radius", Math.abs(Conformal.dot(sphere, sphere) - 4.0) < 1e-9);
+        check("CGA sphere surface point",
+                Math.abs(Conformal.dot(Conformal.point(3, 1, 1), sphere)) < 1e-9);
+        check("CGA sphere interior point",
+                Math.abs(Conformal.dot(Conformal.point(1, 1, 1), sphere) - 2.0) < 1e-9);
+
+        Multivector plane = Conformal.plane(0, 0, 1, -2);
+        check("CGA plane incidence",
+                Math.abs(Conformal.dot(Conformal.point(1, 1, 2), plane)) < 1e-9);
+        check("CGA plane offset",
+                Math.abs(Conformal.dot(Conformal.point(1, 1, 3), plane) - 1.0) < 1e-9);
+
+        Multivector circle = Conformal.circle(0, 0, 2, 0, 0, 1, 1);
+        check("CGA circle grade", circle.grade(3).distanceTo(circle) < 1e-12);
+        check("CGA circle surface point",
+                Conformal.point(1, 0, 2).op(circle).maxAbs() < 1e-9);
+        check("CGA circle off point",
+                Conformal.point(2, 0, 2).op(circle).maxAbs() > 0.5);
+        check("CGA point at infinity rejected", throwsIllegal(() ->
+                Conformal.pointCoords(Conformal.point(1, 1, 1).add(
+                        Multivector.blade(Conformal.SIG, 8, 1)))));
+    }
+
+    private static boolean throwsIllegal(Runnable runnable) {
+        try {
+            runnable.run();
+            return false;
+        } catch (IllegalArgumentException e) {
+            return true;
+        }
     }
 
     private static void check(String name, boolean ok) {
