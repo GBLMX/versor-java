@@ -31,6 +31,7 @@ sigtab <- read.csv("data/table.csv", stringsAsFactors = FALSE)
 batchscale <- read.csv("data/batchscale.csv", stringsAsFactors = FALSE)
 fuzz <- read.csv("data/fuzz.csv", stringsAsFactors = FALSE)
 submask <- read.csv("data/submask.csv", stringsAsFactors = FALSE)
+multicore <- read.csv("data/multicore.csv", stringsAsFactors = FALSE)
 meta <- read.csv("data/meta.csv", stringsAsFactors = FALSE)
 meta_val <- function(key) meta$value[meta$key == key]
 
@@ -124,6 +125,20 @@ cairo_pdf("figures/fig-scale.pdf", width = 6.2, height = 3.6, family = CJK)
 plot(scale$threads, scale$points_per_sec / 1e6, type = "b", pch = 19, lwd = 2,
      col = "#1f5fa8", xlab = "线程数", ylab = "吞吐 (M 点/秒)",
      main = "批量 sandwich 的线程扩展（20 万点）")
+dev.off()
+
+cairo_pdf("figures/fig-multicore.pdf", width = 6.2, height = 3.8, family = CJK)
+workloads <- c("gp_n10", "op_n10", "batch_sandwich", "scalar_sandwich")
+cols <- c("#1f5fa8", "#b45309", "#3f7f5f", "#7c3aed")
+plot(NA, xlim = range(multicore$threads), ylim = c(0, 20), log = "",
+     xlab = "线程数", ylab = "加速比", main = "多核扩展（20 逻辑核）")
+abline(a = 0, b = 1, lty = 2, col = "grey50")
+for (i in seq_along(workloads)) {
+    d <- multicore[multicore$workload == workloads[i], ]
+    d <- d[order(d$threads), ]
+    lines(d$threads, d$speedup, type = "b", pch = 19, col = cols[i], lwd = 2)
+}
+legend("topleft", workloads, pch = 19, col = cols, bty = "n", cex = 0.9)
 dev.off()
 
 cairo_pdf("figures/fig-submask.pdf", width = 6.2, height = 3.6, family = CJK)
@@ -378,6 +393,16 @@ submask_table <- function() {
            paste(rows, collapse = "\n"), "\n\\bottomrule\n\\end{tabular}\n")
 }
 
+multicore_table <- function() {
+    sel <- multicore[multicore$threads %in% c(1, 4, 8, 20), ]
+    rows <- paste0("\\texttt{", tex(sel$workload), "} & ", sel$threads, " & ",
+                   sprintf("%.2f", sel$speedup), " & ",
+                   sprintf("%.0f\\%%", sel$efficiency * 100), " \\\\")
+    paste0("\\begin{tabular}{lrrr}\n\\toprule\n",
+           "负载 & 线程 & 加速比 & 效率 \\\\\n\\midrule\n",
+           paste(rows, collapse = "\n"), "\n\\bottomrule\n\\end{tabular}\n")
+}
+
 # --------------------------------------------------------------------- tex
 
 template <- paste(readLines("template.tex", warn = FALSE), collapse = "\n")
@@ -400,6 +425,7 @@ template <- fill(template, "%%BATCHSCALE%%", batchscale_table())
 template <- fill(template, "%%BATCHSCALEFIG%%", batchscale_fig_table())
 template <- fill(template, "%%FUZZ%%", fuzz_table())
 template <- fill(template, "%%SUBMASK%%", submask_table())
+template <- fill(template, "%%MULTICORE%%", multicore_table())
 template <- fill(template, "%%PAIRS%%", pair_table())
 template <- fill(template, "%%CLIFF%%", cliff_table())
 template <- fill(template, "%%BATCH%%", batch_table())
