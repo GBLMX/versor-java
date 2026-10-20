@@ -100,13 +100,15 @@ public final class Multivector {
     public Multivector gp(Multivector o) {
         check(o);
         double[] r = new double[c.length];
+        int[][] signs = sig.signTable();
         for (int a = 0; a < c.length; a++) {
             double ca = c[a];
             if (ca == 0) continue;
+            int[] row = signs[a];
             for (int b = 0; b < c.length; b++) {
                 double cb = o.c[b];
                 if (cb == 0) continue;
-                int sign = sig.bladeProductSign(a, b);
+                int sign = row[b];
                 if (sign != 0) r[a ^ b] += sign * ca * cb;
             }
         }
@@ -117,13 +119,15 @@ public final class Multivector {
     public Multivector op(Multivector o) {
         check(o);
         double[] r = new double[c.length];
+        int[][] signs = sig.signTable();
         for (int a = 0; a < c.length; a++) {
             double ca = c[a];
             if (ca == 0) continue;
+            int[] row = signs[a];
             for (int b = 0; b < c.length; b++) {
                 double cb = o.c[b];
                 if (cb == 0 || (a & b) != 0) continue;
-                int sign = sig.bladeProductSign(a, b);
+                int sign = row[b];
                 if (sign != 0) r[a ^ b] += sign * ca * cb;
             }
         }
@@ -134,13 +138,15 @@ public final class Multivector {
     public Multivector ip(Multivector o) {
         check(o);
         double[] r = new double[c.length];
+        int[][] signs = sig.signTable();
         for (int a = 0; a < c.length; a++) {
             double ca = c[a];
             if (ca == 0) continue;
+            int[] row = signs[a];
             for (int b = 0; b < c.length; b++) {
                 double cb = o.c[b];
                 if (cb == 0 || (a & b) != a) continue;
-                int sign = sig.bladeProductSign(a, b);
+                int sign = row[b];
                 if (sign != 0) r[a ^ b] += sign * ca * cb;
             }
         }
@@ -156,13 +162,15 @@ public final class Multivector {
     public Multivector rightContraction(Multivector o) {
         check(o);
         double[] r = new double[c.length];
+        int[][] signs = sig.signTable();
         for (int a = 0; a < c.length; a++) {
             double ca = c[a];
             if (ca == 0) continue;
+            int[] row = signs[a];
             for (int b = 0; b < c.length; b++) {
                 double cb = o.c[b];
                 if (cb == 0 || (a & b) != b) continue;
-                int sign = sig.bladeProductSign(a, b);
+                int sign = row[b];
                 if (sign != 0) r[a ^ b] += sign * ca * cb;
             }
         }
@@ -263,7 +271,6 @@ public final class Multivector {
         return n == 0 ? this : divide(n);
     }
 
-    /** Inverse for elements with nonzero ~A A. */
     /**
      * Fast inverse for versors and blades, where {@code A ~A} is the scalar
      * {@link #norm2()}. For arbitrary invertible multivectors use

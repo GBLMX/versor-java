@@ -153,6 +153,19 @@ Multivector n = sphere.normal(0, 0);                // 单位法向 e1
 
 本地书籍路径：`/home/wangwenjie/Documents/论文资料/books/`（不进仓库）。
 
+## 性能
+
+`bench.sh` 是零依赖基准（维度扫描、批量扩展、分配量、矩阵/高维压力、C1/C2 对比，
+检测到 JOML 时附带四元数/矩阵横向对比）：
+
+```bash
+./bench.sh            # 全量
+./bench.sh sweep      # 维度扫描
+BENCH_JAVA_OPTS="-XX:TieredStopAtLevel=1" ./bench.sh jit
+```
+
+完整结果、环境与方法见 [`PERFORMANCE.md`](PERFORMANCE.md)。
+
 ## 批量与矩阵
 
 ```java

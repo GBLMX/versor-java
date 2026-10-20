@@ -129,10 +129,116 @@ public final class MultivectorBatch {
         return new MultivectorBatch(sig, count, r);
     }
 
-    /** {@code versor * element * ~versor} for every element in the batch. */
+    /**
+     * {@code versor * element * ~versor} for every element in the batch.
+     *
+     * <p>E3 vectors and PGA3 trivectors take the same unrolled formulas as
+     * {@link Multivector#sandwich(Multivector)}; the coefficients are read and
+     * written in place, so the batch path allocates only its result arrays.
+     * Keep these formulas in sync with the scalar fast paths.
+     */
     public MultivectorBatch sandwich(Multivector versor) {
         checkSignature(versor);
+        if (isE3() && evenOnly(versor) && onlyBlades(1, 2, 4)) {
+            return sandwichE3(versor);
+        }
+        if (isPga3() && evenOnly(versor) && onlyBlades(7, 11, 13, 14)) {
+            return sandwichPga(versor);
+        }
         return gp(versor).gpRight(versor.reverse());
+    }
+
+    private MultivectorBatch sandwichE3(Multivector versor) {
+        double s = versor.get(0);
+        double b1 = versor.get(3);
+        double b2 = versor.get(5);
+        double b3 = versor.get(6);
+        double[][] r = new double[sig.size][count];
+        double[] x = blades[1];
+        double[] y = blades[2];
+        double[] z = blades[4];
+        for (int i = 0; i < count; i++) {
+            double vx = x[i];
+            double vy = y[i];
+            double vz = z[i];
+            r[1][i] = (s * s - b1 * b1 - b2 * b2 + b3 * b3) * vx
+                    + 2 * (b1 * (s * vy + b3 * vz) + b2 * (s * vz - b3 * vy));
+            r[2][i] = (s * s - b1 * b1 + b2 * b2 - b3 * b3) * vy
+                    + 2 * (-vx * (b1 * s + b2 * b3) + vz * (b3 * s - b1 * b2));
+            r[4][i] = (s * s + b1 * b1 - b2 * b2 - b3 * b3) * vz
+                    + 2 * (vx * (b1 * b3 - b2 * s) - vy * (b1 * b2 + b3 * s));
+        }
+        return new MultivectorBatch(sig, count, r);
+    }
+
+    private MultivectorBatch sandwichPga(Multivector versor) {
+        double s = versor.get(0);
+        double b01 = versor.get(3);
+        double b02 = versor.get(5);
+        double b12 = versor.get(6);
+        double b03 = versor.get(9);
+        double b13 = versor.get(10);
+        double b23 = versor.get(12);
+        double ps = versor.get(15);
+        double[][] r = new double[sig.size][count];
+        double[] p7 = blades[7];
+        double[] p11 = blades[11];
+        double[] p13 = blades[13];
+        double[] p14 = blades[14];
+        for (int i = 0; i < count; i++) {
+            double a7 = p7[i];
+            double a11 = p11[i];
+            double a13 = p13[i];
+            double a14 = p14[i];
+            r[7][i] = (s * s + b12 * b12 - b13 * b13 - b23 * b23) * a7
+                    + 2 * (b12 * (b13 * a11 + b23 * a13) + s * (b23 * a11 - b13 * a13)
+                            + a14 * (ps * b12 - b01 * b13 - b02 * b23 + b03 * s));
+            r[11][i] = (s * s - b12 * b12 + b13 * b13 - b23 * b23) * a11
+                    + 2 * (b12 * (b13 * a7 + s * a13) + b13 * b23 * a13 - s * b23 * a7
+                            + a14 * (ps * b13 + b01 * b12 - b02 * s - b03 * b23));
+            r[13][i] = (s * s - b12 * b12 - b13 * b13 + b23 * b23) * a13
+                    + 2 * (b12 * (b23 * a7 - s * a11) + b13 * (b23 * a11 + s * a7)
+                            + a14 * (ps * b23 + b01 * s + b02 * b12 + b03 * b13));
+            r[14][i] = (s * s + b12 * b12 + b13 * b13 + b23 * b23) * a14;
+        }
+        return new MultivectorBatch(sig, count, r);
+    }
+
+    private boolean isE3() {
+        return sig.n == 3 && sig.metric[0] == 1 && sig.metric[1] == 1 && sig.metric[2] == 1;
+    }
+
+    private boolean isPga3() {
+        return sig.n == 4 && sig.metric[0] == 0 && sig.metric[1] == 1
+                && sig.metric[2] == 1 && sig.metric[3] == 1;
+    }
+
+    private static boolean evenOnly(Multivector m) {
+        for (int mask = 1; mask < m.sig.size; mask++) {
+            if ((Integer.bitCount(mask) & 1) != 0 && m.get(mask) != 0) return false;
+        }
+        return true;
+    }
+
+    private boolean onlyBlades(int m0, int m1, int m2) {
+        for (int mask = 0; mask < sig.size; mask++) {
+            if (mask != m0 && mask != m1 && mask != m2 && !allZero(mask)) return false;
+        }
+        return true;
+    }
+
+    private boolean onlyBlades(int m0, int m1, int m2, int m3) {
+        for (int mask = 0; mask < sig.size; mask++) {
+            if (mask != m0 && mask != m1 && mask != m2 && mask != m3 && !allZero(mask)) return false;
+        }
+        return true;
+    }
+
+    private boolean allZero(int mask) {
+        for (double v : blades[mask]) {
+            if (v != 0) return false;
+        }
+        return true;
     }
 
     public MultivectorBatch add(MultivectorBatch o) {

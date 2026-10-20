@@ -1,6 +1,7 @@
 out/
 out-test/
 out-blaze3d/
+out-bench/
 *.class
 
 # Gradle / Fabric

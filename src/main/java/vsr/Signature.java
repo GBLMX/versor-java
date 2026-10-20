@@ -16,10 +16,10 @@ public final class Signature {
     private final int full;
     private final int nameOffset;
     /**
-     * Precomputed blade-product sign table. Built for up to eight generators
-     * (at most 256 KiB for Cl(8)); larger algebras compute signs on demand.
+     * Blade-product sign table, built lazily on first multiplication.
+     * Cl(10) costs at most 4 MiB; signatures that never multiply pay nothing.
      */
-    private final int[][] productSign;
+    private volatile int[][] productSign;
 
     private Signature(int nameOffset, int[] metric) {
         if (metric.length > 10) {
@@ -34,16 +34,6 @@ public final class Signature {
             if (m < -1 || m > 1) {
                 throw new IllegalArgumentException("metric entries must be -1, 0 or 1");
             }
-        }
-        if (n <= 8) {
-            this.productSign = new int[size][size];
-            for (int a = 0; a < size; a++) {
-                for (int b = 0; b < size; b++) {
-                    productSign[a][b] = computeBladeProductSign(a, b);
-                }
-            }
-        } else {
-            this.productSign = null;
         }
     }
 
@@ -105,10 +95,27 @@ public final class Signature {
      * Returns 0 when a null generator would be squared.
      */
     public int bladeProductSign(int a, int b) {
-        if (productSign != null) {
-            return productSign[a][b];
+        return signTable()[a][b];
+    }
+
+    /** Lazily builds and returns the full sign table (never null). */
+    int[][] signTable() {
+        int[][] table = productSign;
+        if (table != null) return table;
+        synchronized (this) {
+            table = productSign;
+            if (table == null) {
+                int size = 1 << n;
+                table = new int[size][size];
+                for (int a = 0; a < size; a++) {
+                    for (int b = 0; b < size; b++) {
+                        table[a][b] = computeBladeProductSign(a, b);
+                    }
+                }
+                productSign = table;
+            }
+            return table;
         }
-        return computeBladeProductSign(a, b);
     }
 
     private int computeBladeProductSign(int a, int b) {
