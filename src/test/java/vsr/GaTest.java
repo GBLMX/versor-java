@@ -1,5 +1,6 @@
 package vsr;
 
+import java.util.Arrays;
 import java.util.Random;
 
 /**
@@ -47,6 +48,14 @@ public final class GaTest {
                 && cga.bladeProductSign(1, 1) == 1);
         check("CGA names", cga.bladeName(1 << 4).equals("e5"));
         check("custom signature", Signature.of(1, 1, 1).bladeProductSign(1, 1) == 1);
+        Signature mink = Signature.cl(3, 1);
+        check("Cl(3,1) metric", mink.n == 4
+                && Arrays.equals(mink.metric, new int[]{1, 1, 1, -1}));
+        check("Cl(3,1) squares", mink.bladeProductSign(1, 1) == 1
+                && mink.bladeProductSign(8, 8) == -1);
+        check("Cl(3,1) mixed blade", Signature.cl(1, 1).bladeProductSign(1, 2) == 1);
+        check("Cl(p,q) rejects negatives", throwsIllegal(() -> Signature.cl(-1, 2))
+                && throwsIllegal(() -> Signature.cl(8, 8)));
         check("Euclidean names", Signature.euclidean(2).bladeName(2).equals("e2"));
     }
 

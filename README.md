@@ -9,8 +9,9 @@ API 语义参考 `versor`（C++，`/home/wangwenjie/Documents/代码库/versor`�
 
 ## 范围
 
-- 任意 `Cl(p,q,r)`，生成元 ≤ 14 个（$2^n$ 系数）；n≤10 用预计算符号表，
-  n=11–14 按需计算符号（每对更慢，避免 1 GiB 级符号表）
+- 任意 `Cl(p,q,r)`，生成元 ≤ 14 个（$2^n$ 系数）；`Signature.cl(p,q)` 直接给出
+  前 p 个 +1、后 q 个 −1 的度量；n≤10 用预计算符号表，n=11–14 按需计算符号
+  （每对更慢，避免 1 GiB 级符号表）
 - 多向量：几何积、外积、左/右缩并、回归积、交换子/反交换子、
   reverse/conjugate/involution、grade 投影、dual、范数、逆（versor 快速路径
   与任意可逆元素的通用求逆）、指数（缩放平方和）

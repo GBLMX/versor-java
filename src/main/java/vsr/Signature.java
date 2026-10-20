@@ -43,6 +43,25 @@ public final class Signature {
         return new Signature(0, metric);
     }
 
+    /**
+     * Cl(p,q): the first {@code p} generators square to +1 and the next
+     * {@code q} to -1. Generator names start at e0, so Cl(3,1) is
+     * {@code (+ + + -)} in that order (the reverse of {@link #sta()}).
+     */
+    public static Signature cl(int p, int q) {
+        if (p < 0 || q < 0) {
+            throw new IllegalArgumentException("Cl(p,q) needs p,q >= 0");
+        }
+        int n = p + q;
+        if (n > 14) {
+            throw new IllegalArgumentException("Clifford algebras above 14 generators are not supported");
+        }
+        int[] m = new int[n];
+        Arrays.fill(m, 0, p, 1);
+        Arrays.fill(m, p, n, -1);
+        return new Signature(0, m);
+    }
+
     public static Signature euclidean(int n) {
         int[] m = new int[n];
         Arrays.fill(m, 1);
