@@ -18,6 +18,7 @@ public final class GaTest {
         testCoords();
         testReverseAndDual();
         testCppSemantics();
+        testValidation();
         testRotor();
         testSlerpAndLog();
         testStaBoostInterpolation();
@@ -26,6 +27,7 @@ public final class GaTest {
         testPgaRotor();
         testPgaMotorComposition();
         testPgaIntersections();
+        testP3Queries();
         testKinematics();
         testFieldsAndManifolds();
         testWolframGolden();
@@ -155,6 +157,45 @@ public final class GaTest {
                 E3.vec(0, 0, 1).reflect(e1).distanceTo(E3.vec(0, 0, 1)) < 1e-12);
     }
 
+    private static void testValidation() {
+        Multivector vector = E3.vec(1, 2, 3);
+        check("vector is finite", vector.isFinite());
+        check("vector is scalar false", !vector.isScalar(1e-12));
+        check("vector is homogeneous", vector.isHomogeneous(1e-12));
+        check("vector is blade", vector.isBlade(1e-12));
+        check("vector is versor", vector.isVersor(1e-12));
+
+        Multivector rotor = E3.rotor(0, 0, 1, 0.7);
+        check("rotor is versor", rotor.isVersor(1e-12));
+        check("rotor is blade false", !rotor.isBlade(1e-12));
+        check("scalar is blade", Multivector.scalar(E3.SIG, 2).isBlade(1e-12));
+        check("non-versor rejected",
+                !Multivector.scalar(E3.SIG, 1).add(E3.vec(1, 0, 0)).isVersor(1e-12));
+        check("non-finite rejected",
+                !Multivector.scalar(E3.SIG, Double.NaN).isFinite());
+        check("non-finite is not scalar",
+                !Multivector.scalar(E3.SIG, Double.NaN).isScalar(1e-12));
+        check("non-finite is not blade",
+                !Multivector.scalar(E3.SIG, Double.NaN).isBlade(1e-12));
+
+        Signature e4 = Signature.euclidean(4);
+        Multivector nonSimple = Multivector.blade(e4, 0b0011, 1)
+                .add(Multivector.blade(e4, 0b1100, 1));
+        check("non-simple bivector rejected", !nonSimple.isBlade(1e-12));
+        check("scaled non-simple bivector rejected",
+                !nonSimple.scale(1e-20).isBlade(1e-12));
+        check("scaled vector is not scalar", !vector.scale(1e-20).isScalar(1e-12));
+        check("scaled vector is versor", vector.scale(1e-20).isVersor(1e-12));
+
+        Signature e5 = Signature.euclidean(5);
+        Multivector nonSimple3 = Multivector.blade(e5, 0b00111, 1)
+                .add(Multivector.blade(e5, 0b11001, 1));
+        check("non-simple 3-vector rejected", !nonSimple3.isBlade(1e-12));
+        Multivector simple3 = Multivector.blade(e5, 0b00111, 1)
+                .add(Multivector.blade(e5, 0b01011, 1));
+        check("decomposable 3-vector accepted", simple3.isBlade(1e-12));
+    }
+
     private static void testRotor() {
         Multivector e1 = E3.vec(1, 0, 0);
         Multivector e2 = E3.vec(0, 1, 0);
@@ -266,6 +307,43 @@ public final class GaTest {
         double[] p1 = P3.pointCoords(P3.meetPlaneLine(z3, l));
         check("line through points meets plane", Math.abs(p1[0] - 1) < 1e-12
                 && Math.abs(p1[1] - 2) < 1e-12 && Math.abs(p1[2] - 3) < 1e-12);
+    }
+
+    private static void testP3Queries() {
+        Multivector xAxis = P3.line(P3.point(0, 0, 0), P3.point(1, 0, 0));
+        check("line direction", near(P3.lineDirection(xAxis), new double[]{1, 0, 0}, 1e-12));
+        check("line anchor", near(P3.lineAnchor(xAxis), new double[]{0, 0, 0}, 1e-12));
+
+        Multivector query = P3.point(0, 2, 3);
+        check("closest point on x axis",
+                near(P3.pointCoords(P3.closestPointOnLine(xAxis, query)),
+                        new double[]{0, 0, 0}, 1e-12));
+        check("distance to x axis",
+                Math.abs(P3.distancePointLine(xAxis, query) - Math.sqrt(13)) < 1e-12);
+
+        Multivector zLine = P3.line(P3.point(1, 2, 0), P3.point(1, 2, 1));
+        check("z-line direction", near(P3.lineDirection(zLine), new double[]{0, 0, 1}, 1e-12));
+        check("z-line moment", near(P3.lineMoment(zLine), new double[]{2, -1, 0}, 1e-12));
+        check("z-line anchor", near(P3.lineAnchor(zLine), new double[]{1, 2, 0}, 1e-12));
+        check("closest point on z line",
+                near(P3.pointCoords(P3.closestPointOnLine(zLine, P3.point(0, 0, 0))),
+                        new double[]{1, 2, 0}, 1e-12));
+        check("distance to z line",
+                Math.abs(P3.distancePointLine(zLine, P3.point(0, 0, 0)) - Math.sqrt(5)) < 1e-12);
+
+        Multivector z1 = P3.plane(0, 0, 1, -1);
+        check("signed distance to plane",
+                Math.abs(P3.signedDistancePointPlane(z1, P3.point(0, 0, 0)) + 1) < 1e-12);
+        check("distance to plane",
+                Math.abs(P3.distancePointPlane(z1, P3.point(0, 0, 3)) - 2) < 1e-12);
+        check("closest point on plane",
+                near(P3.pointCoords(P3.closestPointOnPlane(z1, P3.point(0, 0, 0))),
+                        new double[]{0, 0, 1}, 1e-12));
+
+        check("degenerate line rejected", throwsIllegal(() ->
+                P3.lineAnchor(Multivector.zero(P3.SIG))));
+        check("degenerate plane rejected", throwsIllegal(() ->
+                P3.distancePointPlane(Multivector.zero(P3.SIG), P3.point(0, 0, 0))));
     }
 
     private static void testKinematics() {
@@ -484,6 +562,30 @@ public final class GaTest {
                 Math.abs(Conformal.dot(Conformal.point(1, 1, 2), plane)) < 1e-9);
         check("CGA plane offset",
                 Math.abs(Conformal.dot(Conformal.point(1, 1, 3), plane) - 1.0) < 1e-9);
+        check("CGA scaled sphere coords",
+                near(Conformal.sphereCoords(sphere.scale(2)),
+                        new double[]{1, 1, 1, 2}, 1e-12));
+        check("CGA scaled sphere distance",
+                Math.abs(Conformal.distancePointSphere(
+                        sphere.scale(-3), Conformal.point(1, 1, 1)) - 2) < 1e-12);
+        check("CGA scaled plane distance",
+                Math.abs(Conformal.distancePointPlane(
+                        plane.scale(2), Conformal.point(0, 0, 0)) - 2) < 1e-12);
+
+        check("CGA sphere coords",
+                near(Conformal.sphereCoords(sphere), new double[]{1, 1, 1, 2}, 1e-12));
+        check("CGA point sphere distance",
+                Math.abs(Conformal.distancePointSphere(sphere, Conformal.point(1, 1, 1)) - 2) < 1e-12);
+        check("CGA closest point on sphere",
+                near(Conformal.pointCoords(
+                        Conformal.closestPointOnSphere(sphere, Conformal.point(1, 1, 1))),
+                        new double[]{3, 1, 1}, 1e-12));
+        check("CGA signed point plane distance",
+                Math.abs(Conformal.signedDistancePointPlane(plane, Conformal.point(0, 0, 0)) + 2) < 1e-12);
+        check("CGA closest point on plane",
+                near(Conformal.pointCoords(
+                        Conformal.closestPointOnPlane(plane, Conformal.point(0, 0, 0))),
+                        new double[]{0, 0, 2}, 1e-12));
 
         Multivector circle = Conformal.circle(0, 0, 2, 0, 0, 1, 1);
         check("CGA circle grade", circle.grade(3).distanceTo(circle) < 1e-12);
@@ -626,6 +728,23 @@ public final class GaTest {
             err = Math.max(err, rotated.get(i).distanceTo(rotor.sandwich(vectors[i])));
         }
         check("batch E3 rotation matches per-element", err < 1e-12);
+
+        MultivectorBatch bo = gb.op(gm);
+        MultivectorBatch bi = gb.ip(gm);
+        MultivectorBatch bor = gb.opRight(gm);
+        MultivectorBatch bir = gb.ipRight(gm);
+        MultivectorBatch bd = gb.dual();
+        MultivectorBatch bu = gb.undual();
+        double qerr = 0;
+        for (int i = 0; i < raw.length; i++) {
+            qerr = Math.max(qerr, bo.get(i).distanceTo(gm.op(raw[i])));
+            qerr = Math.max(qerr, bi.get(i).distanceTo(gm.ip(raw[i])));
+            qerr = Math.max(qerr, bor.get(i).distanceTo(raw[i].op(gm)));
+            qerr = Math.max(qerr, bir.get(i).distanceTo(raw[i].ip(gm)));
+            qerr = Math.max(qerr, bd.get(i).distanceTo(raw[i].dual()));
+            qerr = Math.max(qerr, bu.get(i).distanceTo(raw[i].undual()));
+        }
+        check("batch op/ip/dual match per-element", qerr < 1e-12);
     }
 
     private static void testMatrixInverse() {

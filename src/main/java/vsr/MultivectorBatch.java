@@ -202,6 +202,91 @@ public final class MultivectorBatch {
         return out;
     }
 
+    /** {@code left ^ element} for every element in the batch. */
+    public MultivectorBatch op(Multivector left) {
+        return product(left, true, true);
+    }
+
+    /** {@code element ^ right} for every element in the batch. */
+    public MultivectorBatch opRight(Multivector right) {
+        return product(right, true, false);
+    }
+
+    /** {@code left ⌋ element} for every element in the batch. */
+    public MultivectorBatch ip(Multivector left) {
+        return product(left, false, true);
+    }
+
+    /** {@code element ⌋ right} for every element in the batch. */
+    public MultivectorBatch ipRight(Multivector right) {
+        return product(right, false, false);
+    }
+
+    /** Poincare dual of every element. */
+    public MultivectorBatch dual() {
+        int full = sig.fullMask();
+        double[][] r = new double[sig.size][count];
+        for (int m = 0; m < sig.size; m++) {
+            if (!hasNonzero(blades[m])) continue;
+            int sign = sig.dualSign(m);
+            double[] src = blades[m];
+            double[] dst = r[full ^ m];
+            for (int i = 0; i < count; i++) dst[i] += sign * src[i];
+        }
+        return new MultivectorBatch(sig, count, r);
+    }
+
+    /** Inverse of {@link #dual()} for every element. */
+    public MultivectorBatch undual() {
+        int full = sig.fullMask();
+        double[][] r = new double[sig.size][count];
+        for (int m = 0; m < sig.size; m++) {
+            int comp = full ^ m;
+            if (!hasNonzero(blades[comp])) continue;
+            int k = Integer.bitCount(m);
+            int sign = sig.dualSign(comp) * (((k * (sig.n - k)) & 1) == 0 ? 1 : -1);
+            double[] src = blades[comp];
+            double[] dst = r[m];
+            for (int i = 0; i < count; i++) dst[i] += sign * src[i];
+        }
+        return new MultivectorBatch(sig, count, r);
+    }
+
+    private MultivectorBatch product(Multivector fixed, boolean outer, boolean fixedLeft) {
+        checkSignature(fixed);
+        double[] f = fixed.coefficients();
+        double[][] r = new double[sig.size][count];
+        int size = sig.size;
+        for (int a = 0; a < size; a++) {
+            if (fixedLeft) {
+                if (f[a] == 0) continue;
+                for (int b = 0; b < size; b++) {
+                    if (!hasNonzero(blades[b])) continue;
+                    if (outer ? (a & b) != 0 : (a & b) != a) continue;
+                    int sign = sig.bladeProductSign(a, b);
+                    if (sign == 0) continue;
+                    double factor = f[a] * sign;
+                    addScaled(r[a ^ b], blades[b], factor);
+                }
+            } else {
+                if (!hasNonzero(blades[a])) continue;
+                for (int b = 0; b < size; b++) {
+                    if (f[b] == 0) continue;
+                    if (outer ? (a & b) != 0 : (a & b) != a) continue;
+                    int sign = sig.bladeProductSign(a, b);
+                    if (sign == 0) continue;
+                    double factor = f[b] * sign;
+                    addScaled(r[a ^ b], blades[a], factor);
+                }
+            }
+        }
+        return new MultivectorBatch(sig, count, r);
+    }
+
+    private void addScaled(double[] dst, double[] src, double factor) {
+        for (int i = 0; i < count; i++) dst[i] += factor * src[i];
+    }
+
     /** Zeroes every coefficient of every element. */
     public void clear() {
         for (double[] row : blades) java.util.Arrays.fill(row, 0);

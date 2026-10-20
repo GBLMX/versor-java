@@ -325,7 +325,7 @@ public final class Multivector {
         double[] r = new double[c.length];
         for (int m = 0; m < c.length; m++) {
             if (c[m] == 0) continue;
-            r[full ^ m] += dualSign(m) * c[m];
+            r[full ^ m] += sig.dualSign(m) * c[m];
         }
         return new Multivector(sig, r);
     }
@@ -345,22 +345,10 @@ public final class Multivector {
             int comp = full ^ m;
             if (c[comp] == 0) continue;
             int k = Integer.bitCount(m);
-            int sign = dualSign(comp) * (((k * (sig.n - k)) & 1) == 0 ? 1 : -1);
+            int sign = sig.dualSign(comp) * (((k * (sig.n - k)) & 1) == 0 ? 1 : -1);
             r[m] += sign * c[comp];
         }
         return new Multivector(sig, r);
-    }
-
-    /** Sign contributed by complementing {@code mask} in {@link #dual()}. */
-    private int dualSign(int mask) {
-        int comp = sig.fullMask() ^ mask;
-        int swaps = 0;
-        for (int i = 0; i < sig.n; i++) {
-            if ((mask & (1 << i)) != 0) {
-                swaps += Integer.bitCount(comp & ((1 << i) - 1));
-            }
-        }
-        return (swaps & 1) == 0 ? 1 : -1;
     }
 
     /** Scalar part of A ~A; negative for timelike/null-signature blades. */
@@ -739,6 +727,113 @@ public final class Multivector {
 
     public boolean isZero(double eps) {
         return maxAbs() < eps;
+    }
+
+    /** True when every coefficient is finite. */
+    public boolean isFinite() {
+        for (double v : c) {
+            if (!Double.isFinite(v)) return false;
+        }
+        return true;
+    }
+
+    /** True when only the scalar blade is non-zero within a relative tolerance. */
+    public boolean isScalar(double eps) {
+        if (!isFinite()) return false;
+        double limit = eps * maxAbs();
+        for (int m = 1; m < c.length; m++) {
+            if (Math.abs(c[m]) > limit) return false;
+        }
+        return true;
+    }
+
+    /** True when all non-zero coefficients have the same grade. */
+    public boolean isHomogeneous(double eps) {
+        if (!isFinite()) return false;
+        double limit = eps * maxAbs();
+        int grade = -1;
+        for (int m = 0; m < c.length; m++) {
+            if (Math.abs(c[m]) <= limit) continue;
+            int k = Integer.bitCount(m);
+            if (grade < 0) grade = k;
+            else if (grade != k) return false;
+        }
+        return true;
+    }
+
+    /**
+     * True when this is a simple blade: homogeneous, and the map
+     * {@code v -> v ⌋ A} has rank equal to the grade. Vectors and scalars are
+     * blades. This covers grades above two, where {@code A ^ A = 0} alone is
+     * not sufficient.
+     */
+    public boolean isBlade(double eps) {
+        if (!isFinite() || !isHomogeneous(eps)) return false;
+        int grade = -1;
+        double limit = eps * maxAbs();
+        for (int m = 0; m < c.length; m++) {
+            if (Math.abs(c[m]) > limit) {
+                grade = Integer.bitCount(m);
+                break;
+            }
+        }
+        if (grade <= 1) return true;
+        if (grade > sig.n) return false;
+
+        double[][] image = new double[sig.n][sig.size];
+        double scale = 0;
+        for (int i = 0; i < sig.n; i++) {
+            Multivector contracted = Multivector.blade(sig, 1 << i, 1).ip(this);
+            image[i] = contracted.coefficients();
+            for (double v : image[i]) scale = Math.max(scale, Math.abs(v));
+        }
+        return rank(image, eps * scale) == grade;
+    }
+
+    private static int rank(double[][] matrix, double tolerance) {
+        int rows = matrix.length;
+        int cols = rows == 0 ? 0 : matrix[0].length;
+        int rank = 0;
+        int pivotRow = 0;
+        for (int col = 0; col < cols && pivotRow < rows; col++) {
+            int best = pivotRow;
+            double bestAbs = Math.abs(matrix[best][col]);
+            for (int r = pivotRow + 1; r < rows; r++) {
+                double v = Math.abs(matrix[r][col]);
+                if (v > bestAbs) {
+                    best = r;
+                    bestAbs = v;
+                }
+            }
+            if (bestAbs <= tolerance) continue;
+            if (best != pivotRow) {
+                double[] tmp = matrix[pivotRow];
+                matrix[pivotRow] = matrix[best];
+                matrix[best] = tmp;
+            }
+            double pivot = matrix[pivotRow][col];
+            for (int r = pivotRow + 1; r < rows; r++) {
+                double factor = matrix[r][col] / pivot;
+                if (factor == 0) continue;
+                for (int k = col; k < cols; k++) {
+                    matrix[r][k] -= factor * matrix[pivotRow][k];
+                }
+            }
+            pivotRow++;
+            rank++;
+        }
+        return rank;
+    }
+
+    /**
+     * True when {@code A ~A} is a non-zero scalar, i.e. this is an invertible
+     * versor. This covers vectors, rotors, translators and motors.
+     */
+    public boolean isVersor(double eps) {
+        if (!isFinite()) return false;
+        Multivector square = gp(reverse());
+        if (!square.isScalar(eps)) return false;
+        return Math.abs(square.scalarPart()) > eps * square.maxAbs();
     }
 
     public double distanceTo(Multivector o) {

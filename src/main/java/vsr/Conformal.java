@@ -57,6 +57,80 @@ public final class Conformal {
                 .add(NINF.scale(-d));
     }
 
+    /** Centre (x, y, z) and radius of an OPNS sphere. */
+    public static double[] sphereCoords(Multivector sphere) {
+        check(sphere);
+        double w = sphere.get(E5) - sphere.get(E4);
+        if (Math.abs(w) < 1e-12) {
+            throw new IllegalArgumentException("sphere at infinity");
+        }
+        double[] c = {sphere.get(E1) / w, sphere.get(E2) / w, sphere.get(E3) / w};
+        double r2 = c[0] * c[0] + c[1] * c[1] + c[2] * c[2]
+                - (sphere.get(E4) + sphere.get(E5)) / w;
+        if (r2 < -1e-9) {
+            throw new IllegalArgumentException("sphere has negative radius squared");
+        }
+        return new double[]{c[0], c[1], c[2], Math.sqrt(Math.max(0.0, r2))};
+    }
+
+    /** Plane coefficients {@code (nx, ny, nz, d)} of an encoded plane. */
+    public static double[] planeCoords(Multivector plane) {
+        check(plane);
+        return new double[]{
+            plane.get(E1), plane.get(E2), plane.get(E3),
+            -0.5 * (plane.get(E4) + plane.get(E5))
+        };
+    }
+
+    /** Signed distance from a point to a plane; positive on the normal side. */
+    public static double signedDistancePointPlane(Multivector plane, Multivector query) {
+        double[] pi = planeCoords(plane);
+        double[] p = pointCoords(query);
+        double n2 = pi[0] * pi[0] + pi[1] * pi[1] + pi[2] * pi[2];
+        if (n2 < 1e-24) {
+            throw new IllegalArgumentException("degenerate plane");
+        }
+        return (pi[0] * p[0] + pi[1] * p[1] + pi[2] * p[2] + pi[3]) / Math.sqrt(n2);
+    }
+
+    /** Euclidean distance from a point to a plane. */
+    public static double distancePointPlane(Multivector plane, Multivector query) {
+        return Math.abs(signedDistancePointPlane(plane, query));
+    }
+
+    /** Orthogonal projection of a point onto a plane. */
+    public static Multivector closestPointOnPlane(Multivector plane, Multivector query) {
+        double[] pi = planeCoords(plane);
+        double[] p = pointCoords(query);
+        double n2 = pi[0] * pi[0] + pi[1] * pi[1] + pi[2] * pi[2];
+        if (n2 < 1e-24) {
+            throw new IllegalArgumentException("degenerate plane");
+        }
+        double t = (pi[0] * p[0] + pi[1] * p[1] + pi[2] * p[2] + pi[3]) / n2;
+        return point(p[0] - t * pi[0], p[1] - t * pi[1], p[2] - t * pi[2]);
+    }
+
+    /** Euclidean distance from a point to the surface of a sphere. */
+    public static double distancePointSphere(Multivector sphere, Multivector query) {
+        double[] s = sphereCoords(sphere);
+        double[] p = pointCoords(query);
+        double dx = p[0] - s[0], dy = p[1] - s[1], dz = p[2] - s[2];
+        return Math.abs(Math.sqrt(dx * dx + dy * dy + dz * dz) - s[3]);
+    }
+
+    /** Closest point on a sphere's surface; a sphere centre maps to (c+r, c_y, c_z). */
+    public static Multivector closestPointOnSphere(Multivector sphere, Multivector query) {
+        double[] s = sphereCoords(sphere);
+        double[] p = pointCoords(query);
+        double dx = p[0] - s[0], dy = p[1] - s[1], dz = p[2] - s[2];
+        double length = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (length < 1e-12) {
+            return point(s[0] + s[3], s[1], s[2]);
+        }
+        double scale = s[3] / length;
+        return point(s[0] + dx * scale, s[1] + dy * scale, s[2] + dz * scale);
+    }
+
     /**
      * Circle around {@code c} in the plane with normal {@code n}, as the OPNS
      * trivector through three points of the circle. A point {@code P} lies on
@@ -98,5 +172,11 @@ public final class Conformal {
     /** Squared Euclidean distance between two (possibly non-normalised) points. */
     public static double distanceSq(Multivector a, Multivector b) {
         return -2.0 * dot(a, b);
+    }
+
+    private static void check(Multivector m) {
+        if (m.sig != SIG) {
+            throw new IllegalArgumentException("expected conformal Cl(4,1) multivector");
+        }
     }
 }

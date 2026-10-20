@@ -36,6 +36,7 @@ public final class P3 {
 
     /** Euclidean coordinates of a point trivector. */
     public static double[] pointCoords(Multivector p) {
+        checkPga(p);
         double w = p.get(E123);
         if (Math.abs(w) < 1e-12) throw new IllegalArgumentException("point at infinity");
         return new double[]{-p.get(E023) / w, p.get(E013) / w, -p.get(E012) / w};
@@ -47,6 +48,7 @@ public final class P3 {
     }
 
     public static double[] planeCoords(Multivector plane) {
+        checkPga(plane);
         return new double[]{
                 plane.get(1 << 1), plane.get(1 << 2), plane.get(1 << 3), plane.get(1)
         };
@@ -84,6 +86,66 @@ public final class P3 {
     /** Join of two point trivectors: the line bivector through them. */
     public static Multivector line(Multivector p1, Multivector p2) {
         return p1.vee(p2);
+    }
+
+    /** Direction of a line bivector; not normalized. */
+    public static double[] lineDirection(Multivector line) {
+        checkPga(line);
+        return new double[]{line.get(E23), -line.get(E13), line.get(E12)};
+    }
+
+    /** Moment {@code p x d} of a line bivector, where {@code p} is any point on it. */
+    public static double[] lineMoment(Multivector line) {
+        checkPga(line);
+        return new double[]{line.get(E01), line.get(E02), line.get(E03)};
+    }
+
+    /** Point on the line closest to the origin: {@code (d x m) / |d|^2}. */
+    public static double[] lineAnchor(Multivector line) {
+        double[] d = lineDirection(line);
+        double d2 = dot(d, d);
+        if (d2 < 1e-24) throw new IllegalArgumentException("degenerate line");
+        return scale(cross(d, lineMoment(line)), 1.0 / d2);
+    }
+
+    /** Point on {@code line} closest to {@code query}. */
+    public static Multivector closestPointOnLine(Multivector line, Multivector query) {
+        double[] p = pointCoords(query);
+        double[] d = lineDirection(line);
+        double d2 = dot(d, d);
+        if (d2 < 1e-24) throw new IllegalArgumentException("degenerate line");
+        double[] a = lineAnchor(line);
+        double t = dot(sub(p, a), d) / d2;
+        return point(a[0] + t * d[0], a[1] + t * d[1], a[2] + t * d[2]);
+    }
+
+    /** Euclidean distance from a point to an infinite line. */
+    public static double distancePointLine(Multivector line, Multivector point) {
+        return norm(sub(pointCoords(point), pointCoords(closestPointOnLine(line, point))));
+    }
+
+    /** Signed distance from a point to a plane; positive on the normal side. */
+    public static double signedDistancePointPlane(Multivector plane, Multivector query) {
+        double[] pi = planeCoords(plane);
+        double n2 = pi[0] * pi[0] + pi[1] * pi[1] + pi[2] * pi[2];
+        if (n2 < 1e-24) throw new IllegalArgumentException("degenerate plane");
+        double[] p = pointCoords(query);
+        return (pi[0] * p[0] + pi[1] * p[1] + pi[2] * p[2] + pi[3]) / Math.sqrt(n2);
+    }
+
+    /** Euclidean distance from a point to a plane. */
+    public static double distancePointPlane(Multivector plane, Multivector query) {
+        return Math.abs(signedDistancePointPlane(plane, query));
+    }
+
+    /** Orthogonal projection of a point onto a plane. */
+    public static Multivector closestPointOnPlane(Multivector plane, Multivector query) {
+        double[] pi = planeCoords(plane);
+        double n2 = pi[0] * pi[0] + pi[1] * pi[1] + pi[2] * pi[2];
+        if (n2 < 1e-24) throw new IllegalArgumentException("degenerate plane");
+        double[] p = pointCoords(query);
+        double t = (pi[0] * p[0] + pi[1] * p[1] + pi[2] * p[2] + pi[3]) / n2;
+        return point(p[0] - t * pi[0], p[1] - t * pi[1], p[2] - t * pi[2]);
     }
 
     /** Meet of two planes: the line bivector where they intersect. */
@@ -176,5 +238,33 @@ public final class P3 {
                 ta[0] + (tb[0] - ta[0]) * t,
                 ta[1] + (tb[1] - ta[1]) * t,
                 ta[2] + (tb[2] - ta[2]) * t));
+    }
+
+    private static void checkPga(Multivector value) {
+        if (value.sig != SIG) throw new IllegalArgumentException("not a PGA3 multivector");
+    }
+
+    private static double dot(double[] a, double[] b) {
+        return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    }
+
+    private static double[] cross(double[] a, double[] b) {
+        return new double[]{
+                a[1] * b[2] - a[2] * b[1],
+                a[2] * b[0] - a[0] * b[2],
+                a[0] * b[1] - a[1] * b[0]
+        };
+    }
+
+    private static double[] sub(double[] a, double[] b) {
+        return new double[]{a[0] - b[0], a[1] - b[1], a[2] - b[2]};
+    }
+
+    private static double[] scale(double[] a, double s) {
+        return new double[]{a[0] * s, a[1] * s, a[2] * s};
+    }
+
+    private static double norm(double[] a) {
+        return Math.sqrt(dot(a, a));
     }
 }

@@ -123,6 +123,21 @@ public final class Signature {
         return (grade & 1) == 0 ? 1 : -1;
     }
 
+    /**
+     * Sign used when a basis blade {@code mask} is mapped to its complement
+     * by the Poincare dual in {@link Multivector#dual()}.
+     */
+    public int dualSign(int mask) {
+        int comp = full ^ mask;
+        int swaps = 0;
+        for (int i = 0; i < n; i++) {
+            if ((mask & (1 << i)) != 0) {
+                swaps += Integer.bitCount(comp & ((1 << i) - 1));
+            }
+        }
+        return (swaps & 1) == 0 ? 1 : -1;
+    }
+
     public boolean isScalar(int mask) {
         return mask == 0;
     }

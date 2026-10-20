@@ -15,16 +15,17 @@ API 语义参考 `versor`（C++，`/home/wangwenjie/Documents/代码库/versor`�
 - 多向量：几何积、外积、左/右缩并、回归积、交换子/反交换子、
   reverse/conjugate/involution、grade 投影、dual/undual、标量积、奇 versor 反射、
   多向量除法、范数、逆（versor 快速路径与带均衡化/残差检查的任意可逆元素通用求逆）、
-  指数（缩放平方和）
-- `MultivectorBatch`：按 blade 连续存储的批量运算（gp / gpRight / sandwich /
-  reverse / 算术），避免逐元素对象分配；`sandwich(versor, out)` 复用输出缓冲，
-  `slice(from,to)` 支持分块并行
+  指数（缩放平方和）、`isFinite/isScalar/isHomogeneous/isBlade/isVersor` 校验
+- `MultivectorBatch`：按 blade 连续存储的批量运算（gp / gpRight / op / ip /
+  sandwich / dual / undual / reverse / 算术），避免逐元素对象分配；
+  `sandwich(versor, out)` 复用输出缓冲，`slice(from,to)` 支持分块并行
 - `SparseMultivector`：COO（mask + value）表示，低密度积用哈希累加，
   高密度退回稠密累加器；适合 k≪2^n 的高维输入
 - `MultivectorMatrix`：多向量矩阵乘、转置与 Gauss-Jordan 求逆
 - `E3`：向量、转子、旋转、slerp、log
 - `P3`（PGA3）：点/面/线、translator、motor、变换、平面/直线求交、
-  motor 插值（旋转 slerp + 平移线性）
+  线方向/矩/锚点、点到线/面距离、最近点、平面投影、motor 插值
+- `Conformal`（Cl(4,1)）：点/球/平面/圆、球坐标解码、点到球面/平面距离与最近点
 - `Motion`：twist 定义的刚体运动，解析的位置/速度/加速度/jerk
 - `Field` / `Calculus`：多重向量场，∇F、方向导数、散度、旋度
 - `Manifold`：参数化曲线/曲面，切刃与法向
@@ -85,6 +86,19 @@ Multivector line = P3.meetPlanes(
         P3.plane(1, 0, 0, 0), P3.plane(0, 1, 0, 0));
 double[] hit = P3.pointCoords(
         P3.meetPlaneLine(P3.plane(0, 0, 1, -2), line)); // (0,0,2)
+
+// 几何查询：点到平行 z 轴的直线的距离与最近点
+Multivector zAxis = P3.line(P3.point(1, 2, 0), P3.point(1, 2, 1));
+double[] closest = P3.pointCoords(
+        P3.closestPointOnLine(zAxis, P3.point(0, 0, 0))); // (1,2,0)
+double distance = P3.distancePointLine(zAxis, P3.point(0, 0, 0));
+
+// CGA：点到球面的距离与最近点
+Multivector cgaSphere = Conformal.sphere(1, 1, 1, 2);
+double[] sc = Conformal.sphereCoords(cgaSphere);   // {1, 1, 1, 2}
+double surfaceDistance = Conformal.distancePointSphere(cgaSphere, Conformal.point(1, 1, 1));
+double[] onSphere = Conformal.pointCoords(
+        Conformal.closestPointOnSphere(cgaSphere, Conformal.point(1, 1, 1))); // (3,1,1)
 ```
 
 示例：`examples/CubeDemo.java` 把一个立方体的 8 个顶点用 motor 变换并打印。
@@ -288,7 +302,7 @@ Multivector.GeneralInverse info = a.inverseGeneralResult(); // 不抛，读 resi
 ./build.sh        # javac + 自带断言测试（无需 Maven/Gradle）
 ```
 
-`build.sh` 会编译 `src/main/java`，然后运行 `vsr.GaTest`（412 项断言）。
+`build.sh` 会编译 `src/main/java`，然后运行 `vsr.GaTest`（453 项断言）。
 `build-blaze3d.sh` 额外编译 JOML 适配层并运行 `vsr.blaze3d.Blaze3DTest`（11 项断言）。
 示例：
 
