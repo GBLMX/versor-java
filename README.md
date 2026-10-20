@@ -14,7 +14,7 @@ API 语义参考 `versor`（C++，`/home/wangwenjie/Documents/代码库/versor`�
   （每对更慢，避免 1 GiB 级符号表）
 - 多向量：几何积、外积、左/右缩并、回归积、交换子/反交换子、
   reverse/conjugate/involution、grade 投影、dual、范数、逆（versor 快速路径
-  与任意可逆元素的通用求逆）、指数（缩放平方和）
+  与带均衡化/残差检查的任意可逆元素通用求逆）、指数（缩放平方和）
 - `MultivectorBatch`：按 blade 连续存储的批量运算（gp / gpRight / sandwich /
   reverse / 算术），避免逐元素对象分配；`sandwich(versor, out)` 复用输出缓冲，
   `slice(from,to)` 支持分块并行
@@ -168,8 +168,13 @@ Multivector n = sphere.normal(0, 0);                // 单位法向 e1
 |---|---|---|
 | Alan Macdonald, *Linear and Geometric Algebra* (2010)，中文译本 | 转子 \(R=e^{-B\theta/2}\)、旋转/反射、复合与插值（第 7 章） | 用于 `E3`/`P3`/`Gen` 的符号与手性校验 |
 | Alan Macdonald, *Vector and Geometric Calculus* (2012) | 微分、方向导数、向量导数、线/面积分（第 3、5、7、9 章） | `Calculus` 的 \(\nabla F\)、散度、旋度；扫掠与面积加权采样 |
-| [jeremyong/klein](https://github.com/jeremyong/klein)（MIT，已归档） | PGA 标量参考、测试黄金值、SIMD lane 布局 | 参考符号表/展开思路；**未复制代码**；Panama Vector 不用于模组 |
+| [jeremyong/klein](https://github.com/jeremyong/klein)（MIT，已归档） | PGA 标量参考、测试黄金值、SIMD lane 布局 | 参考符号表/展开思路；**未复制代码**；SIMD 仅作可选原型，不进入模组 |
 | [MozillaFiredoge/Aerodynamics4MC-Core](https://github.com/MozillaFiredoge/Aerodynamics4MC-Core)（MIT） | 薄入口、服务端权威、量化同步、粒子风场 | 采用架构模式；**未复制代码** |
+| Prodanov, [*Algorithmic computation of multivector inverses...*](https://arxiv.org/abs/2308.02291)（2023） | Faddeev–LeVerrier–Souriau 多向量逆/特征多项式 | 采用“先判定可逆、再求逆”的思路；实现仍用数值线性代数 |
+| Higham, [*Iterative Refinement Implies Numerical Stability for Gaussian Elimination*](https://doi.org/10.1090/S0025-5718-1980-0572859-4)（1980） | 迭代精化与后向误差 | `inverseGeneral` 的残差校正与检查准则 |
+| [LAPACK Users' Guide, *How to Measure Errors*](https://netlib.org/lapack/lug/node75.html) | 条件数、后向误差、`RCOND` | 条件数估计与误差度量 |
+| Garamon, [*A Geometric Algebra Library Generator*](https://doi.org/10.1007/s00006-019-0987-7) | 代码生成/展开的性能上限 | 固定公式展开路线，未复制代码 |
+| [*Java Vector API: Benchmarking and Performance Analysis*](https://doi.org/10.1145/3578360.3580265)（2023） | Vector API 的布局与收益边界 | SIMD 原型仅用于批量 SoA 内核 |
 
 本地书籍路径：`/home/wangwenjie/Documents/论文资料/books/`（不进仓库）。
 
@@ -189,11 +194,13 @@ Multivector n = sphere.normal(0, 0);                // 单位法向 e1
 ./bench.sh batchscale   # 分配 vs 复用、线程与块大小
 ./bench.sh multicore    # gp/op/batch/scalar 多核扩展
 ./bench.sh fuzz         # 稠密-稀疏/条件数/退化/精度（需要 JOML）
+./bench.sh simd         # 可选 jdk.incubator.vector 批量 sandwich 原型
 ./bench.sh gabm         # 输出 ga-benchmark 可读 JSON（需要 JOML）
-# 生成的 JSON 可直接交给 ga-benchmark 的 gabm.py
+./run-gabm.sh           # 生成 + 校验；设置 GA_BENCHMARK_DIR 可直接跑 gabm.py
+# 生成的 JSON 含 mean/stddev 聚合，可直接交给 ga-benchmark 的 gabm.py
 ./bench.sh jmh 'JmhDense' -prof gc
 ./bench.sh jmh 'JmhFast' -t 1
-./bench-all.sh          # 全套矩阵（测试、sweep、sparse、robust、render、批量、fuzz、多核、JMH、ga-benchmark）
+./bench-all.sh          # 全套矩阵（测试、sweep、sparse、support、simd、robust、render、批量、fuzz、多核、JMH、ga-benchmark）
 BENCH_JAVA_OPTS="-XX:TieredStopAtLevel=1" ./bench.sh jit
 ```
 
@@ -219,10 +226,22 @@ Multivector p1 = moved.get(1);
 MultivectorMatrix m = new MultivectorMatrix(P3.SIG, 3, 3);
 m.set(0, 0, P3.motor(P3.rotor(0, 0, 1, 0.5), P3.translator(1, 0, 0)));
 MultivectorMatrix inv = m.inverse();              // m.inverse() 要求方阵且可逆
+
+// 通用求逆:均衡化 + 两次迭代精化 + 后向误差检查
+Multivector a = Multivector.scalar(E3.SIG, 1.3)
+        .add(E3.vec(0.4, -0.2, 0.7)).add(E3.bivector(0.1, 0.3, -0.2));
+Multivector invA = a.inverseGeneral();             // 相对残差 > 1e-12 时抛异常
+Multivector.GeneralInverse info = a.inverseGeneralResult(); // 不抛，读 residual/condition
 ```
 
 `MultivectorBatch` 的运算复杂度是 `O(4^n · count)`;`MultivectorMatrix.inverse()`
 对每个主元调用 `inverseGeneral()`(系数空间 `O(8^n)`),适合中小规模压力测试。
+
+`inverseGeneral()` 对系数矩阵做行列均衡化，按最大行/列尺度选主元，再用
+`A x = 1` 的残差做至多两次迭代精化。默认要求相对后向误差 ≤ `1e-12` 且条件数 ≤ `1e12`；
+需要保留病态结果时用 `inverseGeneralResult()` 读取 `residual`、`condition`，
+或传自定义容差 `inverseGeneral(tol)`。条件数很大时即使残差合格，前向误差仍会
+被放大；机器人 IK/物理仿真应优先使用阻尼最小二乘或 SVD 伪逆。
 
 ## 构建与测试
 
@@ -230,7 +249,7 @@ MultivectorMatrix inv = m.inverse();              // m.inverse() 要求方阵且
 ./build.sh        # javac + 自带断言测试（无需 Maven/Gradle）
 ```
 
-`build.sh` 会编译 `src/main/java`，然后运行 `vsr.GaTest`（201 项断言）。
+`build.sh` 会编译 `src/main/java`，然后运行 `vsr.GaTest`（243 项断言）。
 `build-blaze3d.sh` 额外编译 JOML 适配层并运行 `vsr.blaze3d.Blaze3DTest`（11 项断言）。
 示例：
 
@@ -244,6 +263,7 @@ javac -cp out -d out examples/CubeDemo.java && java -cp out CubeDemo
   转子系数、`R e1 ~R` / `R e2 ~R`
 - 随机结合律、`(AB)~ = B~ A~`、`A∧A` 的反对称性
 - PGA：点坐标往返、平移/旋转/复合、逆、面-面/面-线求交、点连线
+- 通用逆：尺度不变、残差/条件数可见、近奇异结果可拒绝
 - 转子：`R ~R = 1`、`exp(log R) = R`、slerp 中点
 - motor：`T R` 作用顺序、逆、`translationOf`/`rotationOf`、插值中点
 - 运动学：旋转/平移/螺旋的解析位置、速度、加速度、jerk，并与位置差分、

@@ -11,6 +11,8 @@ echo "== sparse =="
 ./bench.sh sparse
 echo "== support =="
 ./bench.sh support
+echo "== simd =="
+./bench.sh simd
 echo "== robust =="
 ./bench.sh robust
 echo "== render =="

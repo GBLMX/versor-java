@@ -73,7 +73,9 @@ sprintf("%.1f", rb$ns_per_point), "、缓存 Matrix4f ", sprintf("%.2f", rmx$ns_
 sprintf("%.2f", mc20("op_n10")$speedup), "$\\times$、批量 ", sprintf("%.2f", mc20("batch_sandwich")$speedup),
 "$\\times$、标量 ", sprintf("%.2f", mc20("scalar_sandwich")$speedup), "$\\times$。\n",
 "\\item 断言：", meta_val("checks"), " 项通过；稠密/稀疏逐位一致，子掩码与暴力参考一致；",
-"固定主元阈值在近奇异时可能静默返回不精确逆。\n",
+"\\texttt{inverseGeneral} 采用均衡化、迭代精化与后向误差检查，近奇异结果默认拒绝。\n",
+"\\item SIMD 原型（jdk.incubator.vector）：E3 批量 0.8--1.0$\\times$、PGA3 批量 1.3--1.9$\\times$；",
+"仅保留为可选内核，生产路径仍用标量。\n",
 "\\end{itemize}\n")
 
 # ---------------------------------------------------------------- figures

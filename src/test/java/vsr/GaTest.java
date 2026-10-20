@@ -485,6 +485,25 @@ public final class GaTest {
                 arbitrary.gp(arbitrary.inverseGeneral()).distanceTo(one) < 1e-12);
         check("general inverse A^-1 * A = 1",
                 arbitrary.inverseGeneral().gp(arbitrary).distanceTo(one) < 1e-12);
+        Multivector.GeneralInverse checked = arbitrary.inverseGeneralResult();
+        check("general inverse exposes residual", checked.residual() < 1e-12);
+        check("general inverse exposes condition", checked.condition() < 1e4);
+        Multivector tiny = arbitrary.scale(1e-20);
+        Multivector scaledInv = arbitrary.inverseGeneral().scale(1e20);
+        check("general inverse is scale invariant",
+                tiny.inverseGeneral().distanceTo(scaledInv) / scaledInv.maxAbs() < 1e-12);
+        Multivector nearSingular = Multivector.scalar(E3.SIG, 0.5)
+                .add(Multivector.blade(E3.SIG, 1, 0.5));
+        for (int m = 1; m < E3.SIG.size; m++) {
+            nearSingular = nearSingular.add(Multivector.blade(E3.SIG, m,
+                    (m & 1) == 0 ? 1e-13 : -1e-13));
+        }
+        final Multivector nearSingularFinal = nearSingular;
+        Multivector.GeneralInverse bad = nearSingularFinal.inverseGeneralResult();
+        check("near-singular inverse reports large condition", bad.condition() > 1e10);
+        check("default inverse rejects high condition", throwsArithmetic(nearSingularFinal::inverseGeneral));
+        check("checked inverse rejects excessive backward error",
+                throwsArithmetic(() -> nearSingularFinal.inverseGeneral(bad.relativeResidual() / 2)));
         Multivector divisor = Multivector.scalar(E3.SIG, 0.5)
                 .add(Multivector.blade(E3.SIG, 1, 0.5))
                 .add(Multivector.blade(E3.SIG, 2, 0.5))
@@ -603,6 +622,9 @@ public final class GaTest {
         expected.set(0, 0, Multivector.scalar(E3.SIG, 0.5));
         expected.set(1, 1, Multivector.scalar(E3.SIG, 0.25));
         check("matrix scalar inverse", known.inverse().distanceTo(expected) < 1e-12);
+        MultivectorMatrix tiny = known.scale(1e-20);
+        check("matrix inverse is scale invariant",
+                tiny.inverse().distanceTo(expected.scale(1e20)) / 1e20 < 1e-12);
     }
 
     private static void testSubmaskProducts() {

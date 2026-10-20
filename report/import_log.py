@@ -174,7 +174,8 @@ try:
                    for b in bs if "/D:" in b.get("name", "")})
     with open(os.path.join(out, "gabm.csv"), "w", newline="") as f:
         w = csv.writer(f, lineterminator="\n"); w.writerow(["metric","value"])
-        w.writerow(["benchmarks", len(bs)])
+        w.writerow(["benchmarks", len({b["name"] for b in bs})])
+        w.writerow(["aggregates", len(bs)])
         w.writerow(["operations", len(ops)])
         w.writerow(["models", " ".join(models)])
         w.writerow(["dimensions", " ".join(dims)])

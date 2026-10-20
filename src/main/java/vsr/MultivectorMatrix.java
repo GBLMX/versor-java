@@ -144,7 +144,7 @@ public final class MultivectorMatrix {
                         candidate = r;
                     }
                 }
-                if (candidate < 0 || best < 1e-14) break;
+                if (candidate < 0 || best == 0) break;
                 tried[candidate] = true;
                 try {
                     inv = aug[candidate][col].inverseGeneral();
@@ -165,7 +165,7 @@ public final class MultivectorMatrix {
             for (int r = 0; r < n; r++) {
                 if (r == col) continue;
                 Multivector factor = aug[r][col];
-                if (factor.isZero(1e-14)) continue;
+                if (factor.isZero(0)) continue;
                 for (int c = 0; c < 2 * n; c++) {
                     aug[r][c] = aug[r][c].sub(factor.gp(aug[col][c]));
                 }

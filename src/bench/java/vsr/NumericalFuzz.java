@@ -66,6 +66,8 @@ public final class NumericalFuzz {
         Signature sig = Signature.euclidean(4);
         for (double eps : new double[]{1e-1, 1e-2, 1e-3, 1e-4, 1e-6, 1e-8, 1e-10, 1e-12}) {
             double worst = 0;
+            double worstRelative = 0;
+            double worstCondition = 0;
             int throwsCount = 0;
             for (int trial = 0; trial < 20; trial++) {
                 Multivector a = Multivector.scalar(sig, 0.5)
@@ -73,15 +75,18 @@ public final class NumericalFuzz {
                 for (int m = 1; m < sig.size; m++) {
                     a = a.add(Multivector.blade(sig, m, eps * (rnd.nextDouble() * 2 - 1)));
                 }
+                Multivector.GeneralInverse result = a.inverseGeneralResult();
+                worst = Math.max(worst, result.residual());
+                worstRelative = Math.max(worstRelative, result.relativeResidual());
+                worstCondition = Math.max(worstCondition, result.condition());
                 try {
-                    Multivector inv = a.inverseGeneral();
-                    double res = a.gp(inv).distanceTo(Multivector.scalar(sig, 1));
-                    worst = Math.max(worst, res);
+                    a.inverseGeneral();
                 } catch (ArithmeticException e) {
                     throwsCount++;
                 }
             }
-            System.out.printf("COND,4,%.0e,%.2e,%d%n", eps, worst, throwsCount);
+            System.out.printf("COND,4,%.0e,%.2e,%d,%.2e,%.2e%n",
+                    eps, worst, throwsCount, worstCondition, worstRelative);
         }
 
         System.out.println("## degenerate signature and zero norm");

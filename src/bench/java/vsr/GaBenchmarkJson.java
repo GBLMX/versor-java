@@ -49,9 +49,9 @@ public final class GaBenchmarkJson {
                             if (arg == null) continue; // null blades have no inverse
                         }
                         final Multivector argFinal = arg;
-                        double ns = time(() -> applyUnary(op, argFinal).get(0));
+                        Timing timing = time(() -> applyUnary(op, argFinal).get(0));
                         first = emit(json, first, "UnaryOperation_" + op, modelId, d,
-                                "Grade:" + grade, ns);
+                                "Grade:" + grade, timing);
                     }
                     for (String op : new String[]{"Addition", "Subtraction",
                             "GeometricProduct", "OuterProduct", "LeftContraction",
@@ -65,9 +65,9 @@ public final class GaBenchmarkJson {
                             if (r == null) continue;
                         }
                         final Multivector rFinal = r;
-                        double ns = time(() -> applyBinary(op, l, rFinal).get(0));
+                        Timing timing = time(() -> applyBinary(op, l, rFinal).get(0));
                         first = emit(json, first, "BinaryOperation_" + op, modelId, d,
-                                "LeftGrade:" + grade + "/RightGrade:" + grade, ns);
+                                "LeftGrade:" + grade + "/RightGrade:" + grade, timing);
                     }
                 }
             }
@@ -77,34 +77,50 @@ public final class GaBenchmarkJson {
         System.out.println("wrote " + out + " (" + out.toFile().length() + " bytes)");
     }
 
-    /** Short adaptive timing: warm up, then five ~20 ms rounds, keep the minimum. */
-    private static double time(GaBench.Op op) {
+    private record Timing(double ns, double stddev) {}
+
+    /** Short adaptive timing: warm up, then five ~20 ms rounds. */
+    private static Timing time(GaBench.Op op) {
         for (int i = 0; i < 3; i++) op.apply();
         long t0 = System.nanoTime();
         op.apply();
         double est = Math.max(1, System.nanoTime() - t0);
         long iters = Math.max(3, Math.min(200_000, (long) (20_000_000 / est)));
         for (int i = 0; i < iters; i++) op.apply();
-        double best = Double.MAX_VALUE;
-        for (int round = 0; round < 5; round++) {
+        double[] samples = new double[5];
+        double sum = 0;
+        for (int round = 0; round < samples.length; round++) {
             t0 = System.nanoTime();
             for (long i = 0; i < iters; i++) op.apply();
-            best = Math.min(best, (System.nanoTime() - t0) / (double) iters);
+            samples[round] = (System.nanoTime() - t0) / (double) iters;
+            sum += samples[round];
         }
-        return best;
+        double mean = sum / samples.length;
+        double variance = 0;
+        for (double sample : samples) variance += (sample - mean) * (sample - mean);
+        return new Timing(mean, Math.sqrt(variance / (samples.length - 1)));
     }
 
     private static boolean emit(StringBuilder b, boolean first, String op, int model, int d,
-                                String args, double ns) {
+                                String args, Timing timing) {
         if (!first) b.append(",\n");
+        appendSample(b, op, model, d, args, timing.ns(), "mean");
+        b.append(",\n");
+        appendSample(b, op, model, d, args, timing.stddev(), "stddev");
+        return false;
+    }
+
+    /** Google Benchmark emits one entry per aggregate; gabm.py needs mean and stddev. */
+    private static void appendSample(StringBuilder b, String op, int model, int d,
+                                     String args, double ns, String aggregate) {
         b.append("    {\"name\": \"GABM_").append(op)
                 .append("/SystemName:Linux/SystemVersion:unknown/CompilerID:GNU/CompilerVersion:25")
                 .append("/Solution:versor-java/Model:").append(model)
                 .append("/D:").append(d).append('/').append(args)
                 .append("\", \"iterations\": 1, \"cpu_time\": ")
                 .append(String.format(Locale.ROOT, "%.6f", ns / 1e6))
-                .append(", \"time_unit\": \"ms\", \"aggregate_name\": \"mean\"}");
-        return false;
+                .append(", \"time_unit\": \"ms\", \"aggregate_name\": \"").append(aggregate)
+                .append("\"}");
     }
 
     private static Signature signature(String model, int d) {

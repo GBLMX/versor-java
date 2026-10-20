@@ -322,47 +322,198 @@ public final class Multivector {
     }
 
     /**
+     * Result of {@link #inverseGeneralResult()}.
+     *
+     * @param value            the computed inverse
+     * @param residual         {@code max |A x - 1|} after iterative refinement
+     * @param relativeResidual residual divided by {@code ||A||_inf ||x||_inf + 1}
+     * @param condition        infinity-norm estimate {@code ||A||_inf ||A^-1||_inf}
+     */
+    public record GeneralInverse(Multivector value, double residual,
+                                 double relativeResidual, double condition) {}
+
+    /** Default maximum relative backward error accepted by {@link #inverseGeneral()}. */
+    public static final double INVERSE_TOLERANCE = 1e-12;
+
+    /** Default condition-number ceiling accepted by {@link #inverseGeneral()}. */
+    public static final double INVERSE_CONDITION_LIMIT = 1e12;
+
+    /**
      * Inverse for an arbitrary invertible multivector, including elements
      * whose reverse product is not scalar. Solves the linear system
      * {@code A x = 1} on the coefficient space, costing {@code O(size^3)}
      * scalar operations; {@link #inverse()} is the {@code O(size^2)} fast path
      * for versors.
+     *
+     * <p>The coefficient matrix is equilibrated before elimination and the
+     * result is checked with a backward-error bound. An
+     * {@link ArithmeticException} is thrown when the relative residual exceeds
+     * {@link #INVERSE_TOLERANCE}; use {@link #inverseGeneral(double)} to choose
+     * another tolerance, or {@link #inverseGeneralResult()} to inspect an
+     * ill-conditioned result instead of rejecting it. The no-argument form also
+     * rejects condition estimates above {@link #INVERSE_CONDITION_LIMIT}.
      */
     public Multivector inverseGeneral() {
+        GeneralInverse result = inverseGeneral(INVERSE_TOLERANCE);
+        if (!(result.condition() <= INVERSE_CONDITION_LIMIT)) {
+            throw new ArithmeticException("ill-conditioned inverse: condition "
+                    + result.condition() + " > " + INVERSE_CONDITION_LIMIT);
+        }
+        return result.value();
+    }
+
+    /** Checked inversion with an explicit relative backward-error tolerance. */
+    public GeneralInverse inverseGeneral(double tolerance) {
+        GeneralInverse result = inverseGeneralResult();
+        if (!(result.relativeResidual() <= tolerance)) {
+            throw new ArithmeticException("ill-conditioned inverse: relative residual "
+                    + result.relativeResidual() + " > " + tolerance
+                    + ", condition ~ " + result.condition());
+        }
+        return result;
+    }
+
+    /**
+     * Computes the general inverse and its error estimate without rejecting a
+     * large residual. Exact singularities still throw {@link ArithmeticException}.
+     */
+    public GeneralInverse inverseGeneralResult() {
         int n = c.length;
-        double[][] m = new double[n][n + 1];
+        double[][] a = new double[n][n];
         for (int col = 0; col < n; col++) {
             Multivector product = gp(new Multivector(sig, unitMask(col)));
             for (int row = 0; row < n; row++) {
-                m[row][col] = product.get(row);
+                a[row][col] = product.get(row);
             }
         }
+
+        double[] rowScale = new double[n];
         for (int row = 0; row < n; row++) {
-            m[row][n] = row == 0 ? 1 : 0;
+            double max = 0;
+            for (int col = 0; col < n; col++) max = Math.max(max, Math.abs(a[row][col]));
+            if (max == 0) throw new ArithmeticException("element is not invertible");
+            rowScale[row] = max;
         }
+        double[] colScale = new double[n];
+        for (int col = 0; col < n; col++) {
+            double max = 0;
+            for (int row = 0; row < n; row++) {
+                max = Math.max(max, Math.abs(a[row][col]) / rowScale[row]);
+            }
+            if (max == 0) throw new ArithmeticException("element is not invertible");
+            colScale[col] = max;
+        }
+
+        double[][] s = new double[n][n];
+        for (int row = 0; row < n; row++) {
+            for (int col = 0; col < n; col++) {
+                s[row][col] = a[row][col] / (rowScale[row] * colScale[col]);
+            }
+        }
+        double[][] sInv = invertEquilibrated(s);
+        double[][] inv = new double[n][n];
+        for (int row = 0; row < n; row++) {
+            for (int col = 0; col < n; col++) {
+                inv[row][col] = sInv[row][col] / (colScale[row] * rowScale[col]);
+            }
+        }
+
+        double[] x = new double[n];
+        for (int row = 0; row < n; row++) x[row] = inv[row][0];
+        double residual = inverseResidual(a, x);
+        for (int step = 0; step < 2 && residual > 1e-14; step++) {
+            double[] correction = matVec(inv, inverseErrorVector(a, x));
+            double[] candidate = x.clone();
+            for (int row = 0; row < n; row++) candidate[row] -= correction[row];
+            double candidateResidual = inverseResidual(a, candidate);
+            if (!(candidateResidual < residual)) break;
+            x = candidate;
+            residual = candidateResidual;
+        }
+
+        double normA = maxRowSum(a);
+        double normInv = maxRowSum(inv);
+        double condition = normA * normInv;
+        double scale = normA * maxAbs(x) + 1;
+        double relativeResidual = residual / scale;
+        if (!Double.isFinite(relativeResidual) || !Double.isFinite(condition)) {
+            throw new ArithmeticException("inverse is not numerically finite");
+        }
+        return new GeneralInverse(new Multivector(sig, x), residual, relativeResidual, condition);
+    }
+
+    /** Gauss-Jordan inverse of an already equilibrated coefficient matrix. */
+    private static double[][] invertEquilibrated(double[][] a) {
+        int n = a.length;
+        double[][] m = new double[n][2 * n];
+        for (int row = 0; row < n; row++) {
+            System.arraycopy(a[row], 0, m[row], 0, n);
+            m[row][n + row] = 1;
+        }
+        double pivotTolerance = Math.ulp(1.0) * n;
         for (int col = 0; col < n; col++) {
             int pivot = col;
             for (int row = col + 1; row < n; row++) {
                 if (Math.abs(m[row][col]) > Math.abs(m[pivot][col])) pivot = row;
             }
-            if (Math.abs(m[pivot][col]) < 1e-14) {
+            if (!(Math.abs(m[pivot][col]) > pivotTolerance)) {
                 throw new ArithmeticException("element is not invertible");
             }
             double[] swap = m[col];
             m[col] = m[pivot];
             m[pivot] = swap;
             double p = m[col][col];
-            for (int j = col; j <= n; j++) m[col][j] /= p;
+            for (int j = col; j < 2 * n; j++) m[col][j] /= p;
             for (int row = 0; row < n; row++) {
                 if (row == col) continue;
                 double f = m[row][col];
                 if (f == 0) continue;
-                for (int j = col; j <= n; j++) m[row][j] -= f * m[col][j];
+                for (int j = col; j < 2 * n; j++) m[row][j] -= f * m[col][j];
             }
         }
-        double[] r = new double[n];
-        for (int row = 0; row < n; row++) r[row] = m[row][n];
-        return new Multivector(sig, r);
+        double[][] inv = new double[n][n];
+        for (int row = 0; row < n; row++) {
+            System.arraycopy(m[row], n, inv[row], 0, n);
+        }
+        return inv;
+    }
+
+    private double inverseResidual(double[][] a, double[] x) {
+        return maxAbs(inverseErrorVector(a, x));
+    }
+
+    private double[] inverseErrorVector(double[][] a, double[] x) {
+        Multivector ax = gp(new Multivector(sig, x.clone()));
+        double[] error = new double[a.length];
+        for (int row = 0; row < a.length; row++) error[row] = ax.get(row);
+        error[0] -= 1;
+        return error;
+    }
+
+    private static double[] matVec(double[][] matrix, double[] vector) {
+        double[] out = new double[matrix.length];
+        for (int row = 0; row < matrix.length; row++) {
+            double sum = 0;
+            for (int col = 0; col < matrix.length; col++) sum += matrix[row][col] * vector[col];
+            out[row] = sum;
+        }
+        return out;
+    }
+
+    private static double maxRowSum(double[][] matrix) {
+        double max = 0;
+        for (double[] row : matrix) {
+            double sum = 0;
+            for (double value : row) sum += Math.abs(value);
+            max = Math.max(max, sum);
+        }
+        return max;
+    }
+
+    private static double maxAbs(double[] values) {
+        double max = 0;
+        for (double value : values) max = Math.max(max, Math.abs(value));
+        return max;
     }
 
     private double[] unitMask(int mask) {

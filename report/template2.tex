@@ -162,9 +162,9 @@ JOML 列是 float、单次调用，JIT 可能对标量运算做常量折叠或�
 \caption{近奇异元素的逆残差。}\label{fig:cond}
 \end{figure}
 
-导出的 ga-benchmark JSON 含 397 个 benchmark、20 类算子，覆盖
-Euclidean/Homogeneous/Conformal 的 D=3/4 与 grade 维度；格式已被其
-\texttt{gabm.py} 读取。
+导出的 ga-benchmark JSON 含 397 个逻辑 benchmark（794 条 mean/stddev 聚合）、
+20 类算子，覆盖 Euclidean/Homogeneous/Conformal 的 D=3/4 与 grade 维度；
+\texttt{run-gabm.sh} 已完成生成、字段校验与上游 \texttt{gabm.py} 驱动。
 
 %%GABM%%
 
@@ -180,8 +180,9 @@ Euclidean/Homogeneous/Conformal 的 D=3/4 与 grade 维度；格式已被其
       %%REUSE1M%% ns/点、分配降为 0；4 线程达到平台，更多线程无收益。
 \item \textbf{端到端差距来自算法层}：缓存 \texttt{Matrix4f} 比通用 GA 快一个
       数量级；固定公式应生成/展开专用内核（Gaigen/Gaalop/GATL 的共同结论）。
-\item \textbf{正确性}：稠密/稀疏逐位一致，子掩码与暴力参考一致；固定主元
-      阈值 1e-14 在近奇异时可能静默返回不精确的逆，调用方应检查残差。
+\item \textbf{正确性}：稠密/稀疏逐位一致，子掩码与暴力参考一致；
+      \texttt{inverseGeneral} 先做行列均衡化、两次迭代精化和后向误差检查，
+      近奇异结果默认拒绝，\texttt{inverseGeneralResult} 保留残差/条件数。
 \end{enumerate}
 
 \section{参考资料}
@@ -193,6 +194,16 @@ Euclidean/Homogeneous/Conformal 的 D=3/4 与 grade 维度；格式已被其
 \item JOML：\url{https://github.com/JOML-CI/JOML}，float 四元数与列主序矩阵对照。
 \item Macdonald, \emph{Linear and Geometric Algebra}、\emph{Vector and Geometric
       Calculus}：转子约定、场微分与面积加权采样。
+\item Prodanov, \emph{Algorithmic computation of multivector inverses and
+      characteristic polynomials in non-degenerate Clifford algebras},
+      arXiv:2308.02291：FVS 求逆路线。
+\item Higham, \emph{Iterative Refinement Implies Numerical Stability for
+      Gaussian Elimination}, Math. Comp. 35 (1980)：迭代精化与后向误差。
+\item LAPACK Users' Guide, \emph{How to Measure Errors}：条件数与 RCOND。
+\item Breuils et al., \emph{Garamon: A Geometric Algebra Library Generator},
+      Adv. Appl. Clifford Algebras (2019)：展开/生成代码的性能上限。
+\item \emph{Java Vector API: Benchmarking and Performance Analysis},
+      ACM SIGPLAN (2023)：Vector API 的布局与收益边界。
 \end{itemize}
 
 \section{复现与限制}
@@ -203,7 +214,8 @@ cd report && Rscript report2.R  # rebuild this report
 \end{verbatim}
 
 限制：单机、非隔离、单线程为主；多核为 6P+8E/20 逻辑核；JOML 为 float；
-未启用 Java Vector API（incubator，Minecraft 启动参数不可控）；ga-benchmark
-仅覆盖 Euclidean D=3/4、Homogeneous/Conformal D=3。
+Vector API 仅作可选原型（incubator，Minecraft 启动参数不可控），生产路径仍用
+标量；ga-benchmark 仅覆盖 Euclidean D=3/4、Homogeneous/Conformal D=3，
+且上游尚未注册 \texttt{versor-java}，\texttt{run-gabm.sh} 在临时副本中补登记。
 
 \end{document}

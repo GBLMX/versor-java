@@ -15,7 +15,7 @@ n,op,ns
 3,unit,93.83
 3,inverse,62.69
 3,sandwich,175.45
-3,inverseGeneral,751.32
+3,inverseGeneral,1725.73
 3,exp,1047.36
 4,add,12.31
 4,gp,280.49
@@ -33,7 +33,7 @@ n,op,ns
 4,unit,283.72
 4,inverse,103.98
 4,sandwich,552.0
-4,inverseGeneral,1931.14
+4,inverseGeneral,4425.43
 4,exp,1528.56
 5,add,22.35
 5,gp,906.84
@@ -51,7 +51,7 @@ n,op,ns
 5,unit,963.79
 5,inverse,157.26
 5,sandwich,1838.73
-5,inverseGeneral,6038.42
+5,inverseGeneral,14426.55
 5,exp,2133.89
 6,add,41.61
 6,gp,3864.74
@@ -69,7 +69,7 @@ n,op,ns
 6,unit,3544.49
 6,inverse,293.37
 6,sandwich,7468.0
-6,inverseGeneral,27116.6
+6,inverseGeneral,65745.16
 6,exp,3685.2
 7,add,82.21
 7,gp,14256.78

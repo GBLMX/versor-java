@@ -48,6 +48,12 @@ case "$MODE" in
         src/bench/java/vsr/GaBench.java src/bench/java/vsr/BatchScalingBench.java
     $JAVA ${BENCH_JAVA_OPTS:-} -Xmx10g -cp out-bench vsr.BatchScalingBench
     exit 0 ;;
+  simd)
+    mkdir -p out-simd
+    javac --release 25 --add-modules jdk.incubator.vector -d out-simd \
+        src/simd/java/vsr/SimdSandwich.java src/simd/java/vsr/SimdSandwichBench.java
+    $JAVA --add-modules jdk.incubator.vector -cp out-simd vsr.SimdSandwichBench
+    exit 0 ;;
   fuzz|gabm)
     if [ -z "$JOML_JAR" ] || [ ! -f "$JOML_JAR" ]; then
         echo "$MODE needs JOML for compile (set JOML_JAR)." >&2; exit 1
