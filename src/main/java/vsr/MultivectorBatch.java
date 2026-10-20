@@ -322,8 +322,7 @@ public final class MultivectorBatch {
     public MultivectorBatch reverse() {
         double[][] r = new double[blades.length][count];
         for (int m = 0; m < blades.length; m++) {
-            int k = sig.grade(m);
-            double s = ((k * (k - 1) / 2) & 1) == 0 ? 1 : -1;
+            double s = Signature.reverseSign(sig.grade(m));
             for (int i = 0; i < count; i++) {
                 r[m][i] = blades[m][i] * s;
             }

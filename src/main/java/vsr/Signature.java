@@ -96,6 +96,33 @@ public final class Signature {
         return Integer.bitCount(mask);
     }
 
+    /** Metric factor of a basis blade squared: product of its generator metrics. */
+    public int bladeSquareSign(int mask) {
+        int sign = 1;
+        for (int i = 0; i < n; i++) {
+            if ((mask & (1 << i)) == 0) continue;
+            int m = metric[i];
+            if (m == 0) return 0;
+            sign *= m;
+        }
+        return sign;
+    }
+
+    /** Reversion sign of a grade-k blade: (-1)^(k(k-1)/2). */
+    public static int reverseSign(int grade) {
+        return ((grade * (grade - 1) / 2) & 1) == 0 ? 1 : -1;
+    }
+
+    /** Clifford-conjugation sign of a grade-k blade: (-1)^(k(k+1)/2). */
+    public static int conjugateSign(int grade) {
+        return ((grade * (grade + 1) / 2) & 1) == 0 ? 1 : -1;
+    }
+
+    /** Grade-involution sign: (-1)^k. */
+    public static int involutionSign(int grade) {
+        return (grade & 1) == 0 ? 1 : -1;
+    }
+
     public boolean isScalar(int mask) {
         return mask == 0;
     }

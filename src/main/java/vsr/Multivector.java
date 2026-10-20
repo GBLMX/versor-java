@@ -101,6 +101,21 @@ public final class Multivector {
         check(o);
         double[] r = new double[c.length];
         int[][] signs = sig.signTable();
+        int aCount = nonZeroCount(c);
+        int bCount = nonZeroCount(o.c);
+        if ((long) aCount * bCount * 4 < (long) c.length * c.length) {
+            int[] ai = nonZeroIndices(c, aCount);
+            int[] bi = nonZeroIndices(o.c, bCount);
+            for (int ia : ai) {
+                double ca = c[ia];
+                int[] row = signs != null ? signs[ia] : null;
+                for (int ib : bi) {
+                    int sign = row != null ? row[ib] : sig.computeBladeProductSign(ia, ib);
+                    if (sign != 0) r[ia ^ ib] += sign * ca * o.c[ib];
+                }
+            }
+            return new Multivector(sig, r);
+        }
         for (int a = 0; a < c.length; a++) {
             double ca = c[a];
             if (ca == 0) continue;
@@ -113,6 +128,23 @@ public final class Multivector {
             }
         }
         return new Multivector(sig, r);
+    }
+
+    private static int nonZeroCount(double[] values) {
+        int nz = 0;
+        for (double v : values) {
+            if (v != 0) nz++;
+        }
+        return nz;
+    }
+
+    private static int[] nonZeroIndices(double[] values, int count) {
+        int[] idx = new int[count];
+        int p = 0;
+        for (int i = 0; i < values.length; i++) {
+            if (values[i] != 0) idx[p++] = i;
+        }
+        return idx;
     }
 
     /** Outer (wedge) product. Enumerates disjoint blades: O(3^n) pairs. */
@@ -201,9 +233,7 @@ public final class Multivector {
     public Multivector reverse() {
         double[] r = new double[c.length];
         for (int m = 0; m < c.length; m++) {
-            int k = sig.grade(m);
-            double s = ((k * (k - 1) / 2) & 1) == 0 ? 1 : -1;
-            r[m] = c[m] * s;
+            r[m] = c[m] * Signature.reverseSign(sig.grade(m));
         }
         return new Multivector(sig, r);
     }
@@ -212,9 +242,7 @@ public final class Multivector {
     public Multivector conjugate() {
         double[] r = new double[c.length];
         for (int m = 0; m < c.length; m++) {
-            int k = sig.grade(m);
-            double s = ((k * (k + 1) / 2) & 1) == 0 ? 1 : -1;
-            r[m] = c[m] * s;
+            r[m] = c[m] * Signature.conjugateSign(sig.grade(m));
         }
         return new Multivector(sig, r);
     }
@@ -223,7 +251,7 @@ public final class Multivector {
     public Multivector involution() {
         double[] r = new double[c.length];
         for (int m = 0; m < c.length; m++) {
-            r[m] = (sig.grade(m) & 1) == 0 ? c[m] : -c[m];
+            r[m] = c[m] * Signature.involutionSign(sig.grade(m));
         }
         return new Multivector(sig, r);
     }

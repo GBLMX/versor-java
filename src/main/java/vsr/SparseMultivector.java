@@ -212,8 +212,7 @@ public final class SparseMultivector {
     public SparseMultivector reverse() {
         double[] v = new double[values.length];
         for (int i = 0; i < masks.length; i++) {
-            int k = Integer.bitCount(masks[i]);
-            v[i] = (((k * (k - 1) / 2) & 1) == 0 ? 1 : -1) * values[i];
+            v[i] = Signature.reverseSign(sig.grade(masks[i])) * values[i];
         }
         return new SparseMultivector(sig, masks.clone(), v);
     }
@@ -245,22 +244,10 @@ public final class SparseMultivector {
         double sum = 0;
         for (int i = 0; i < masks.length; i++) {
             int mask = masks[i];
-            int metric = bladesSquareSign(mask);
+            int metric = sig.bladeSquareSign(mask);
             sum += metric * values[i] * values[i];
         }
         return sum;
-    }
-
-    /** Product of metric entries for the generators in the blade. */
-    private int bladesSquareSign(int mask) {
-        int sign = 1;
-        for (int j = 0; j < sig.n; j++) {
-            if ((mask & (1 << j)) == 0) continue;
-            int m = sig.metric[j];
-            if (m == 0) return 0;
-            sign *= m;
-        }
-        return sign;
     }
 
     public double maxAbs() {

@@ -673,6 +673,12 @@ public final class GaTest {
         check("sparse norm2 matches dense",
                 Math.abs(sa.norm2() - da.norm2()) < 1e-12);
         Multivector rotor = E3.rotor(0.3, -0.7, 0.2, 0.9);
+        Signature s8 = Signature.euclidean(8);
+        Multivector pa = Multivector.blade(s8, 1, 0.7).add(Multivector.blade(s8, 12, -0.2));
+        Multivector pb = Multivector.blade(s8, 2, 0.3).add(Multivector.blade(s8, 9, 0.5));
+        check("sparse-support gp matches COO", pa.gp(pb)
+                .distanceTo(SparseMultivector.fromDense(pa)
+                        .gp(SparseMultivector.fromDense(pb)).toDense()) < 1e-15);
         SparseMultivector srotor = SparseMultivector.fromDense(rotor);
         check("sparse versor inverse",
                 srotor.inverse().toDense().distanceTo(rotor.inverse()) < 1e-12);
