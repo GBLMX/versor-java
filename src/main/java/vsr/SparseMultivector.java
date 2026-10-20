@@ -5,8 +5,8 @@ import java.util.TreeMap;
 
 /**
  * Sparse multivector (COO: sorted masks + values) for high-dimensional and
- * low-density algebras. Products cost O(k1*k2 + 2^n) instead of the dense
- * O(4^n), at the price of a dense accumulator during each product.
+ * low-density algebras. Products cost O(k1*k2) with an open-addressing
+ * accumulator, or O(k1*k2 + 2^n) for dense-ish inputs, instead of O(4^n).
  */
 public final class SparseMultivector {
     public final Signature sig;
