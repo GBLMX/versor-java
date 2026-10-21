@@ -20,17 +20,19 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Build, test, package
-        run: ./build.sh
+      - name: Build, test, stage publication
+        run: ./gradlew build centralBundle --no-daemon --stacktrace
 
       - name: Blaze3D adapter test
         run: |
           curl -fsSL -o /tmp/joml.jar https://repo1.maven.org/maven2/org/joml/joml/1.10.9/joml-1.10.9.jar
           JOML_JAR=/tmp/joml.jar ./build-blaze3d.sh
 
-      - name: Upload jars
+      - name: Upload Maven layout
         uses: actions/upload-artifact@v7
         with:
-          name: versor-java-1.0.0
-          path: dist/*.jar
+          name: versor-java-1.0.0-maven
+          path: |
+            build/staging-repo
+            build/distributions/*.zip
           if-no-files-found: error

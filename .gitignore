@@ -1,7 +1,3 @@
-out/
-dist/
-out-javadoc/
-out-test/
 out-blaze3d/
 out-bench/
 *.class

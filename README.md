@@ -15,16 +15,28 @@ API 语义参考 `versor`（C++，`/home/wangwenjie/Documents/代码库/versor`�
 
 ## 安装
 
-`build.sh` 生成三个 jar：`dist/versor-java-1.0.0.jar`（类）、
-`-sources.jar` 与 `-javadoc.jar`。直接加入 classpath 即可，无运行时依赖：
+Maven 坐标（发布到 Maven Central 后可用）：
 
-```bash
-javac -cp dist/versor-java-1.0.0.jar MyApp.java
-java -cp dist/versor-java-1.0.0.jar:. MyApp
+```kotlin
+implementation("io.github.gblmx:versor-java:1.0.0")
 ```
 
-自动模块名为 `vsr`（`Automatic-Module-Name`）。暂未发布到 Maven Central；
-需要坐标时先用本地 jar。
+```xml
+<dependency>
+  <groupId>io.github.gblmx</groupId>
+  <artifactId>versor-java</artifactId>
+  <version>1.0.0</version>
+</dependency>
+```
+
+本地验证可先发布到 `~/.m2`：
+
+```bash
+./gradlew publishToMavenLocal
+```
+
+发布包为零运行时依赖，自动模块名 `vsr`。直接使用 jar 时，构建后位于
+`build/libs/versor-java-1.0.0.jar`（同目录另有 sources/javadoc jar）。
 
 ## 范围
 
@@ -123,8 +135,6 @@ double[] onSphere = Conformal.pointCoords(
         Conformal.closestPointOnSphere(cgaSphere, Conformal.point(1, 1, 1))); // (3,1,1)
 ```
 
-示例：`examples/CubeDemo.java` 把一个立方体的 8 个顶点用 motor 变换并打印。
-
 ### C++ versor 语义对齐
 
 ```java
@@ -184,8 +194,6 @@ double[] j = m.jerk(0.5, 1, 0, 0);
 Motion spin = Motion.rotation(0, 0, 1, Math.PI);   // 纯旋转
 Motion drift = Motion.translation(1, 0, 0);        // 纯平移
 ```
-
-示例：`examples/KinematicsDemo.java`。
 
 ## Blaze3D / Minecraft 集成（可选）
 
@@ -321,16 +329,17 @@ Multivector.GeneralInverse info = a.inverseGeneralResult(); // 不抛，读 resi
 ## 构建与测试
 
 ```bash
-./build.sh        # javac + 断言测试 + 三个 release jar（无需 Maven/Gradle）
+./gradlew build
 ```
 
-`build.sh` 会编译 `src/main/java`，运行 `vsr.GaTest`（454 项断言），再生成
-class、sources、javadoc 三个 jar。CI 另跑 JOML 适配层测试。
-`build-blaze3d.sh` 额外编译 JOML 适配层并运行 `vsr.blaze3d.Blaze3DTest`（11 项断言）。
-示例：
+Gradle 用 toolchain 编译到 Java 17，运行 `vsr.GaTest`（454 项断言），并生成主 jar、
+sources jar、javadoc jar。Gradle 9.7 本身需要 JDK 17–25 启动；如果宿主默认是
+JDK 26+，先设置 `JAVA_HOME` 指向 JDK 21/17。
+
+`build-blaze3d.sh` 额外编译 JOML 适配层并运行 `vsr.blaze3d.Blaze3DTest`（11 项断言）：
 
 ```bash
-javac -cp out -d out examples/CubeDemo.java && java -cp out CubeDemo
+JOML_JAR=/path/to/joml-1.10.9.jar ./build-blaze3d.sh
 ```
 
 ## 验证
@@ -352,6 +361,29 @@ javac -cp out -d out examples/CubeDemo.java && java -cp out CubeDemo
 1.0.0 起按语义化版本管理公开 API。`Signature.metric` 已改为只读访问：
 `metric(int)` 读取单条，`metricCopy()` 返回防御性副本；直接修改度量不再可能。
 需要破坏性变更时升主版本。
+
+## 发布
+
+发布坐标固定为 `io.github.gblmx:versor-java`。Central Portal 首次发布前，需要
+用 GitHub 验证 `io.github.gblmx` 命名空间，并把 GPG 公钥发到 keyserver。
+
+本地已配置 GPG key 时，通过 gpg-agent 签名并生成上传包：
+
+```bash
+./gradlew centralBundle -PuseGpgCmd
+```
+
+无交互 CI 使用 armored 私钥和口令，不要把私钥写进仓库：
+
+```bash
+./gradlew centralBundle \
+  -PsigningKey="$SIGNING_KEY" \
+  -PsigningPassword="$SIGNING_PASSWORD"
+```
+
+上传 `build/distributions/versor-java-1.0.0-central.zip` 到
+<https://central.sonatype.com/>。不传签名参数时签名任务跳过，仅用于本地/CI
+验证布局；Central 会拒绝未签名或未验证命名空间的包。
 
 ## 许可
 

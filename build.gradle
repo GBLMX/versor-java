@@ -1,0 +1,127 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'signing'
+}
+
+group = 'io.github.gblmx'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+    withSourcesJar()
+    withJavadocJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-Xlint:all'
+}
+
+tasks.withType(Javadoc).configureEach {
+    options.encoding = 'UTF-8'
+    options.addBooleanOption('Xdoclint:none', true)
+    options.quiet()
+}
+
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
+jar {
+    manifest {
+        attributes(
+            'Automatic-Module-Name': 'vsr',
+            'Implementation-Title': 'versor-java',
+            'Implementation-Version': project.version
+        )
+    }
+    from('LICENSE') { into 'META-INF' }
+    from('NOTICE') { into 'META-INF' }
+}
+
+// The test source is a plain main() harness, not a JUnit suite.
+tasks.named('test') {
+    enabled = false
+}
+
+tasks.register('gaTest', JavaExec) {
+    group = 'verification'
+    description = 'Runs the self-contained geometric algebra checks.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'vsr.GaTest'
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('gaTest')
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifactId = 'versor-java'
+            pom {
+                name = 'versor-java'
+                description = 'Geometric algebra (Clifford algebra) for Java computer graphics.'
+                url = 'https://github.com/GBLMX/versor-java'
+                licenses {
+                    license {
+                        name = 'Apache License, Version 2.0'
+                        url = 'https://www.apache.org/licenses/LICENSE-2.0'
+                        distribution = 'repo'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'GBLMX'
+                        name = 'GBLMX'
+                        email = 'muzhibaoxiang@163.com'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:https://github.com/GBLMX/versor-java.git'
+                    developerConnection = 'scm:git:ssh://git@github.com/GBLMX/versor-java.git'
+                    url = 'https://github.com/GBLMX/versor-java'
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            name = 'staging'
+            url = layout.buildDirectory.dir('staging-repo').get().asFile.toURI()
+        }
+    }
+}
+
+signing {
+    def signingKey = providers.gradleProperty('signingKey').orNull
+    def useGpgAgent = providers.gradleProperty('useGpgCmd').isPresent()
+    if (signingKey) {
+        useInMemoryPgpKeys(signingKey, providers.gradleProperty('signingPassword').orNull ?: '')
+    } else if (useGpgAgent) {
+        useGpgCmd()
+    }
+    required = signingKey != null || useGpgAgent
+    sign publishing.publications.mavenJava
+}
+
+tasks.register('centralBundle', Zip) {
+    group = 'publishing'
+    description = 'Builds a Maven Central Portal upload bundle.'
+    dependsOn tasks.named('publishAllPublicationsToStagingRepository')
+    from(layout.buildDirectory.dir('staging-repo')) {
+        exclude '**/maven-metadata.xml*'
+    }
+    archiveFileName = "versor-java-${project.version}-central.zip"
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+}
