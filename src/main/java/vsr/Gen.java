@@ -51,7 +51,7 @@ public final class Gen {
             if (sig.grade(m) != 2) continue;
             int lo = Integer.numberOfTrailingZeros(m);
             int hi = 31 - Integer.numberOfLeadingZeros(m);
-            if (sig.metric[lo] == 1 && sig.metric[hi] == 1) {
+            if (sig.metric(lo) == 1 && sig.metric(hi) == 1) {
                 return Multivector.blade(sig, m, Math.PI);
             }
         }

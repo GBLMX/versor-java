@@ -627,12 +627,12 @@ public final class Multivector {
     }
 
     private boolean isE3() {
-        return sig.n == 3 && sig.metric[0] == 1 && sig.metric[1] == 1 && sig.metric[2] == 1;
+        return sig.n == 3 && sig.metric(0) == 1 && sig.metric(1) == 1 && sig.metric(2) == 1;
     }
 
     private boolean isPga3() {
-        return sig.n == 4 && sig.metric[0] == 0 && sig.metric[1] == 1
-                && sig.metric[2] == 1 && sig.metric[3] == 1;
+        return sig.n == 4 && sig.metric(0) == 0 && sig.metric(1) == 1
+                && sig.metric(2) == 1 && sig.metric(3) == 1;
     }
 
     /** True when every odd-grade coefficient is zero. */

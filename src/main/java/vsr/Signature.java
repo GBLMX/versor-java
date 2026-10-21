@@ -11,7 +11,7 @@ import java.util.Arrays;
  */
 public final class Signature {
     public final int n;
-    public final int[] metric;
+    private final int[] metric;
     public final int size;
     private final int full;
     private final int nameOffset;
@@ -86,6 +86,16 @@ public final class Signature {
     /** 3D conformal model: e1..e4 spacelike, e5 timelike. */
     public static Signature cga3() {
         return new Signature(1, new int[]{1, 1, 1, 1, -1});
+    }
+
+    /** Metric entry for generator {@code i}: +1, -1 or 0. */
+    public int metric(int i) {
+        return metric[i];
+    }
+
+    /** Defensive copy of the metric, in generator order. */
+    public int[] metricCopy() {
+        return metric.clone();
     }
 
     public int fullMask() {

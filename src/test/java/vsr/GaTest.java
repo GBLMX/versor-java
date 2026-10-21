@@ -54,7 +54,7 @@ public final class GaTest {
         check("custom signature", Signature.of(1, 1, 1).bladeProductSign(1, 1) == 1);
         Signature mink = Signature.cl(3, 1);
         check("Cl(3,1) metric", mink.n == 4
-                && Arrays.equals(mink.metric, new int[]{1, 1, 1, -1}));
+                && Arrays.equals(mink.metricCopy(), new int[]{1, 1, 1, -1}));
         check("Cl(3,1) squares", mink.bladeProductSign(1, 1) == 1
                 && mink.bladeProductSign(8, 8) == -1);
         check("Cl(3,1) mixed blade", Signature.cl(1, 1).bladeProductSign(1, 2) == 1);

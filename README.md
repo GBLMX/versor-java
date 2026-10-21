@@ -1,11 +1,30 @@
 # versor-java
 
+[![Build](https://github.com/GBLMX/versor-java/actions/workflows/build.yml/badge.svg)](https://github.com/GBLMX/versor-java/actions/workflows/build.yml)
+![Java](https://img.shields.io/badge/Java-17%2B-orange)
+![License](https://img.shields.io/badge/license-Apache--2.0-blue)
+
+**版本 1.0.0** · 零运行时依赖 · Java 17+
+
 面向计算机图形学的 Java 几何代数（Clifford 代数）库。
 
 API 语义参考 `versor`（C++，`/home/wangwenjie/Documents/代码库/versor`：
 `Multivector` 的 `gp / op / ip / dual / reverse`，`Gen::rot / trs / mot / log`），
 采用 Java 的运行期签名 + 位掩码实现，不照搬其编译期模板类型系统。
 数值用 PyPI 的 `galgebra` 与 Wolfram `CliffordAlgebra` 交叉验证。
+
+## 安装
+
+`build.sh` 生成三个 jar：`dist/versor-java-1.0.0.jar`（类）、
+`-sources.jar` 与 `-javadoc.jar`。直接加入 classpath 即可，无运行时依赖：
+
+```bash
+javac -cp dist/versor-java-1.0.0.jar MyApp.java
+java -cp dist/versor-java-1.0.0.jar:. MyApp
+```
+
+自动模块名为 `vsr`（`Automatic-Module-Name`）。暂未发布到 Maven Central；
+需要坐标时先用本地 jar。
 
 ## 范围
 
@@ -302,10 +321,11 @@ Multivector.GeneralInverse info = a.inverseGeneralResult(); // 不抛，读 resi
 ## 构建与测试
 
 ```bash
-./build.sh        # javac + 自带断言测试（无需 Maven/Gradle）
+./build.sh        # javac + 断言测试 + 三个 release jar（无需 Maven/Gradle）
 ```
 
-`build.sh` 会编译 `src/main/java`，然后运行 `vsr.GaTest`（454 项断言）。
+`build.sh` 会编译 `src/main/java`，运行 `vsr.GaTest`（454 项断言），再生成
+class、sources、javadoc 三个 jar。CI 另跑 JOML 适配层测试。
 `build-blaze3d.sh` 额外编译 JOML 适配层并运行 `vsr.blaze3d.Blaze3DTest`（11 项断言）。
 示例：
 
@@ -326,3 +346,13 @@ javac -cp out -d out examples/CubeDemo.java && java -cp out CubeDemo
   加速度差分交叉验证
 - 几何微积分：旋量场散度/旋度/∇F、标量场梯度、方向导数；平面/球面法向、
   螺旋线切向；面积元与通量积分（球面通量 = 4πR³）
+
+## 版本与稳定性
+
+1.0.0 起按语义化版本管理公开 API。`Signature.metric` 已改为只读访问：
+`metric(int)` 读取单条，`metricCopy()` 返回防御性副本；直接修改度量不再可能。
+需要破坏性变更时升主版本。
+
+## 许可
+
+Apache License 2.0；见 [`LICENSE`](LICENSE) 与 [`NOTICE`](NOTICE)。
