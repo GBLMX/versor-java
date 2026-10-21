@@ -1,6 +1,7 @@
 # versor-java
 
 [![Build](https://github.com/GBLMX/versor-java/actions/workflows/build.yml/badge.svg)](https://github.com/GBLMX/versor-java/actions/workflows/build.yml)
+![Maven Central](https://img.shields.io/maven-central/v/io.github.gblmx/versor-java)
 ![Java](https://img.shields.io/badge/Java-17%2B-orange)
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 
@@ -15,7 +16,7 @@ API 语义参考 `versor`（C++，`/home/wangwenjie/Documents/代码库/versor`�
 
 ## 安装
 
-Maven 坐标（发布到 Maven Central 后可用）：
+Maven Central 坐标：
 
 ```kotlin
 implementation("io.github.gblmx:versor-java:1.0.0")
@@ -364,8 +365,8 @@ JOML_JAR=/path/to/joml-1.10.9.jar ./build-blaze3d.sh
 
 ## 发布
 
-发布坐标固定为 `io.github.gblmx:versor-java`。Central Portal 首次发布前，需要
-用 GitHub 验证 `io.github.gblmx` 命名空间，并把 GPG 公钥发到 keyserver。
+发布坐标固定为 `io.github.gblmx:versor-java`，1.0.0 已完成首次 Central 发布。
+后续版本发布前，确认 `io.github.gblmx` 命名空间和 GPG 公钥仍有效。
 
 本地已配置 GPG key 时，通过 gpg-agent 签名并生成上传包：
 
