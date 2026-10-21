@@ -4,7 +4,11 @@ set -e
 cd "$(dirname "$0")"
 export JAVA=${JAVA:-$HOME/.jdks/jbrsdk-25.0.3/bin/java}
 echo "== build/tests =="
-sh build.sh
+if [ -x "$JAVA" ]; then
+    JAVA_HOME=$(cd "$(dirname "$JAVA")/.." && pwd)
+    export JAVA_HOME
+fi
+./gradlew build --no-daemon
 echo "== sweep/batch/stress/jit/joml =="
 ./bench.sh all
 echo "== sparse =="

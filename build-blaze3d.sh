@@ -1,5 +1,5 @@
 #!/bin/sh
-# Builds the optional Blaze3D (JOML) adapter. The core build.sh stays
+# Builds the optional Blaze3D (JOML) adapter. The core Gradle build stays
 # dependency-free.
 set -e
 cd "$(dirname "$0")"
